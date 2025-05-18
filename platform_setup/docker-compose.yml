@@ -9,7 +9,7 @@ services:
       - ./database_setup_sql_scripts:/docker-entrypoint-initdb.d
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT}:${POSTGRES_PORT}"
     networks:
       - data-network
     healthcheck:
@@ -17,7 +17,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-      start_period: 120s
+      start_period: 30s
 
   mongodb:
     image: mongo:6.0
@@ -30,7 +30,7 @@ services:
     volumes:
       - mongodb_data:/data/db
     ports:
-      - "27017:27017"
+      - "${MONGO_PORT}:${MONGO_PORT}"
     networks:
       - data-network
     healthcheck:
@@ -51,12 +51,12 @@ services:
     volumes:
       - minio_data:/data
     ports:
-      - "9000:9000"
+      - "${MINIO_PORT}:${MINIO_PORT}"
       - "9001:9001"
     networks:
       - data-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "curl", "-f", "http://localhost:${MINIO_PORT}/minio/health/live"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -67,18 +67,15 @@ services:
     container_name: kafka
     restart: always
     environment:
-      # KRaft settings
       - KAFKA_ENABLE_KRAFT=yes
       - KAFKA_CFG_NODE_ID=0
       - KAFKA_CFG_PROCESS_ROLES=controller,broker
       - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka:9093
-      # Listener settings
       - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
       - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
       - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
-      # General settings
       - ALLOW_PLAINTEXT_LISTENER=yes
       - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
     ports:
@@ -111,30 +108,30 @@ services:
       minio:
         condition: service_healthy
     environment:
-      POSTGRES_HOST: ${POSTGRES_HOST}
-      POSTGRES_PORT: ${POSTGRES_PORT}
-      POSTGRES_DATABASE_NAME: ${POSTGRES_DATABASE_NAME}
-      DB_USER: ${PROJECT_USER}
-      DB_PASSWORD: ${PROJECT_PASSWORD}
-      MONGO_HOST: ${MONGO_HOST}
-      MONGO_PORT: ${MONGO_PORT}
-      MONGO_USER: ${PROJECT_USER}
-      MONGO_PASSWORD: ${PROJECT_PASSWORD}
-      MONGO_DB: ${MONGO_DATABASE_NAME}
-      MINIO_HOST: ${MINIO_HOST}
-      MINIO_PORT: ${MINIO_PORT}
-      MINIO_USER: ${PROJECT_USER}
-      MINIO_PASSWORD: ${PROJECT_PASSWORD}
-      MINIO_CLIENT_GAMMA_STORAGE_BUCKET: ${MINIO_CLIENT_GAMMA_STORAGE_BUCKET}
-      MINIO_CLICKSTREAM_TELEMETRY_BUCKET: ${MINIO_CLICKSTREAM_TELEMETRY_BUCKET}
-      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
-      KAFKA_CLICKSTREAM_USER_BEHAVIOUR_TOPIC: ${KAFKA_CLICKSTREAM_USER_BEHAVIOUR_TOPIC}
-      KAFKA_TELEMETRY_VEHICLE_STATS_TOPIC: ${KAFKA_TELEMETRY_VEHICLE_STATS_TOPIC}
-      KAFKA_ANALYTICS_SESSION_DURATION_TOPIC: ${KAFKA_ANALYTICS_SESSION_DURATION_TOPIC}
+      POSTGRES_HOST: "${POSTGRES_HOST}"
+      POSTGRES_PORT: "${POSTGRES_PORT}"
+      POSTGRES_DATABASE_NAME: "${POSTGRES_DATABASE_NAME}"
+      DB_USER: "${PROJECT_USER}"
+      DB_PASSWORD: "${PROJECT_PASSWORD}"
+      MONGO_HOST: "${MONGO_HOST}"
+      MONGO_PORT: "${MONGO_PORT}"
+      MONGO_USER: "${PROJECT_USER}"
+      MONGO_PASSWORD: "${PROJECT_PASSWORD}"
+      MONGO_DB: "${MONGO_DATABASE_NAME}"
+      MINIO_HOST: "${MINIO_HOST}"
+      MINIO_PORT: "${MINIO_PORT}"
+      MINIO_USER: "${PROJECT_USER}"
+      MINIO_PASSWORD: "${PROJECT_PASSWORD}"
+      MINIO_CLIENT_GAMMA_STORAGE_BUCKET: "${MINIO_CLIENT_GAMMA_STORAGE_BUCKET}"
+      MINIO_CLICKSTREAM_TELEMETRY_BUCKET: "${MINIO_CLICKSTREAM_TELEMETRY_BUCKET}"
+      KAFKA_BOOTSTRAP_SERVERS: "${KAFKA_BOOTSTRAP_SERVERS}"
+      KAFKA_CLICKSTREAM_USER_BEHAVIOUR_TOPIC: "${KAFKA_CLICKSTREAM_USER_BEHAVIOUR_TOPIC}"
+      KAFKA_TELEMETRY_VEHICLE_STATS_TOPIC: "${KAFKA_TELEMETRY_VEHICLE_STATS_TOPIC}"
+      KAFKA_ANALYTICS_SESSION_DURATION_TOPIC: "${KAFKA_ANALYTICS_SESSION_DURATION_TOPIC}"
     volumes:
       - python_logs:/app/logs
       - ../support_insights/data_generators:/app/scripts/support_insights
-      - ../clickstream-telemetry/data_generators:/app/scripts/clickstream-telemetry
+      - ../clickstream_telemetry/data_generators:/app/scripts/clickstream-telemetry
       - ./python_scripts_orchestrator:/app/scripts/python_scripts_orchestrator
     ports:
       - "1212:1212"
@@ -149,12 +146,170 @@ services:
     networks:
       - data-network
 
+  spark:
+    build:
+      context: ../platform_setup
+      dockerfile: ../platform_setup/dockerfiles/spark.dockerfile
+    container_name: spark
+    environment:
+      SPARK_MODE: master
+      SPARK_WORKER_INSTANCES: 1
+      SPARK_WORKER_MEMORY: 1G
+      PYSPARK_PYTHON: /opt/bitnami/python/bin/python3
+      PYSPARK_DRIVER_PYTHON: /opt/bitnami/python/bin/python3
+      SPARK_RPC_AUTHENTICATION_ENABLED: "false"
+      SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED: "false"
+      SPARK_SSL_ENABLED: "false"
+    ports:
+      - "7077:7077"
+      - "1234:8080"
+    volumes:
+      - ./jars/postgresql-jdbc.jar:/opt/bitnami/spark/jars/postgresql-jdbc.jar:ro
+    networks:
+      - data-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  airflow:
+    build:
+      context: ../platform_setup
+      dockerfile: ../platform_setup/dockerfiles/airflow.dockerfile
+    container_name: airflow
+    restart: always
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW_LOAD_EXAMPLES: "no"
+      PYTHONPATH: /opt/airflow
+      AIRFLOW__LOGGING__BASE_LOG_FOLDER: /opt/airflow/logs
+      AIRFLOW__LOGGING__LOGGING_LEVEL: INFO
+      AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
+      AIRFLOW_WEBSERVER_SECRET_KEY: "${AIRFLOW_WEBSERVER_SECRET_KEY}"
+      AIRFLOW_APISERVER_SECRET_KEY: "${AIRFLOW_APISERVER_SECRET_KEY}"
+      AIRFLOW_FERNET_KEY: "${AIRFLOW_FERNET_KEY}"
+      AIRFLOW_USERNAME: "${PROJECT_USER}"
+      AIRFLOW_PASSWORD: "${PROJECT_PASSWORD}"
+      AIRFLOW_FIRSTNAME: "${FIRST_NAME}"
+      AIRFLOW_LASTNAME: "${LAST_NAME}"
+      AIRFLOW_EMAIL: "${EMAIL_ADDRESS}"
+      AIRFLOW_DATABASE_NAME: "${AIRFLOW_METADATA_DATABASE}"
+      AIRFLOW_DATABASE_USERNAME: "${POSTGRES_DEFAULT_USER}"
+      AIRFLOW_DATABASE_PASSWORD: "${PROJECT_PASSWORD}"
+      AIRFLOW_DATABASE_HOST: "${POSTGRES_HOST}"
+      AIRFLOW_DATABASE_PORT_NUMBER: "${POSTGRES_PORT}"
+    volumes:
+      - ../support_insights/data_loaders:/opt/airflow/dags/support_insights
+      - ../clickstream_telemetry/data_loaders:/opt/airflow/dags/clickstream_telemetry
+      - airflow_logs:/opt/airflow/logs
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - data-network
+
+  trino:
+    image: trinodb/trino:475
+    container_name: trino
+    restart: always
+    ports:
+      - "8082:8080"
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: "${POSTGRES_HOST}"
+      POSTGRES_PORT: "${POSTGRES_PORT}"
+      POSTGRES_DEFAULT_USER: "${POSTGRES_DEFAULT_USER}"
+      POSTGRES_PASSWORD: "${PROJECT_PASSWORD}"
+      HIVE_METASTORE_DATABASE: "${HIVE_METASTORE_DATABASE}"
+      MINIO_HOST: "${MINIO_HOST}"
+      MINIO_PORT: "${MINIO_PORT}"
+      PROJECT_USER: "${PROJECT_USER}"
+      PROJECT_PASSWORD: "${PROJECT_PASSWORD}"
+      ICEBERG_FILE_FORMAT: "${ICEBERG_FILE_FORMAT}"
+      S3_PATH_STYLE_ACCESS: "${S3_PATH_STYLE_ACCESS}"
+      TRINO_HTTP_PORT: "8082"
+      TRINO_ENVIRONMENT: "${TRINO_ENVIRONMENT}"
+      TRINO_DATA_DIR: "${TRINO_DATA_DIR}"
+    volumes:
+    - ./trino/etc:/etc/trino:ro
+    - ./trino/etc:/usr/lib/trino/etc/:ro
+    - ./jars/postgresql-jdbc.jar:/usr/lib/trino/plugin/iceberg/postgresql-jdbc.jar:ro
+    - ./docker_entrypoint_scripts/trino_startup.sh:/trino_startup.sh:ro
+    command: >
+      /bin/bash /trino_startup.sh
+    networks:
+      - data-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/info"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  superset:
+    build:
+      context: ../platform_setup
+      dockerfile: dockerfiles/superset.dockerfile
+    container_name: superset
+    restart: always
+    ports:
+      - "8088:8088"
+    environment:
+      - SUPERSET_PORT=8088
+      - SUPERSET_SECRET_KEY=${PROJECT_PASSWORD}
+      - SUPERSET_DATABASE_DIALECT=postgresql+psycopg2
+      - SUPERSET_DATABASE_USER=postgres
+      - SUPERSET_DATABASE_PASSWORD=${PROJECT_PASSWORD}
+      - SUPERSET_DATABASE_HOST=${POSTGRES_HOST}
+      - SUPERSET_DATABASE_PORT_NUMBER=${POSTGRES_PORT}
+      - SUPERSET_DATABASE_NAME=${SUPERSET_METADATA_DATABASE}
+      - SUPERSET_CONFIG_PATH=/opt/bitnami/superset/superset_config.py
+      - FIRST_NAME=${FIRST_NAME}
+      - LAST_NAME=${LAST_NAME}
+      - EMAIL_ADDRESS=${EMAIL_ADDRESS}
+      - PROJECT_USER=${PROJECT_USER}
+      - PROJECT_PASSWORD=${PROJECT_PASSWORD}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - SUPERSET_METADATA_DATABASE=${SUPERSET_METADATA_DATABASE}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    volumes:
+      - ../clickstream_telemetry/data_dashboards:/app/bitnami/superset_home/clickstream_telemetry/dashboards
+      - ../support_insights/data_dashboards:/app/bitnami/superset_home/support_insights/dashboards
+      - ./docker_entrypoint_scripts/superset_startup.sh:/superset_startup.sh
+    networks:
+      - data-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
 volumes:
   postgres_data:
   mongodb_data:
   minio_data:
   kafka_data:
   python_logs:
+  airflow_logs:
 
 networks:
   data-network:

@@ -1,1 +1,11 @@
 .env
+__pycache__/
+custom_entrypoint.sh
+hive_site.xml
+iceberg.properties
+config.properties
+node.properties
+jvm.config
+log.properties
+*_bak
+*.jar
