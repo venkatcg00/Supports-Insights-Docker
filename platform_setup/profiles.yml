@@ -1,0 +1,13 @@
+trino:
+  target: dev
+  outputs:
+    dev:
+      type: trino
+      method: none
+      user: admin
+      host: trino
+      port: 8080
+      schema: public
+      catalog: iceberg
+      threads: 4
+      http_scheme: http

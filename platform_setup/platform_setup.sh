@@ -79,5 +79,9 @@ bash "$SCRIPT_DIR/setup_bash_scripts/create_superset_connections.sh"
 log "Importing Superset dashboards if missing..."
 bash "$SCRIPT_DIR/setup_bash_scripts/import_superset_dashboards.sh"
 
+# ========== Step 12: Show We UI ports of docker apps ==========
+log "Importing Superset dashboards if missing..."
+bash "$SCRIPT_DIR/setup_bash_scripts/print_endpoints.sh"
+
 # ========== Done ==========
 log "Platform setup complete. All services are up and initialized." "$GREEN"

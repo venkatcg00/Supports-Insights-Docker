@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Idempotently add Superset DB connections (Postgres + Trino) using Python within Superset container
+# Idempotently add Superset DB connections (Postgres + Trino) using YAML within Superset container
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -24,36 +24,46 @@ else
   exit 1
 fi
 
-echo "[INFO] Adding Superset DBs using Python script inside $SUPERSET_CONTAINER"
+# Wait for Superset to be healthy
+echo "[INFO] Waiting for Superset to be healthy..."
+until docker exec $SUPERSET_CONTAINER curl -f http://localhost:8088/health > /dev/null 2>&1; do
+  echo "Superset is not healthy yet. Retrying in 5 seconds..."
+  sleep 5
+done
+echo "[INFO] Superset is healthy."
 
-docker exec -i "$SUPERSET_CONTAINER" python3 <<EOF
-from superset.app import create_app
+echo "[INFO] Adding Superset DB connections"
 
-app = create_app()
-
-with app.app_context():
-    from superset import db, security_manager
-    from superset.models.core import Database
-
-    def add_or_update_connection(name, uri):
-        existing = db.session.query(Database).filter_by(database_name=name).first()
-        if existing:
-            print(f"[UPDATE] Connection '{name}' already exists, updating URI.")
-            existing.sqlalchemy_uri = uri
-            existing.extra = '{}'
-        else:
-            print(f"[ADD] Creating new connection '{name}'.")
-            new_db = Database(
-                database_name=name,
-                sqlalchemy_uri=uri,
-                extra='{}',
-                created_by_fk=security_manager.find_user('admin').id if security_manager.find_user('admin') else None
-            )
-            db.session.add(new_db)
-        db.session.commit()
-
-    add_or_update_connection("Postgres_Project_DB", "postgresql://${PROJECT_USER}:${PROJECT_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DATABASE_NAME}")
-    add_or_update_connection("Trino_Project_DB", "trino://${PROJECT_USER}:${PROJECT_PASSWORD}@${TRINO_HOST}:${TRINO_HTTP_PORT}/iceberg")
+# Create temporary YAML file in user-writable directory
+mkdir -p "$HOME/tmp"
+TEMP_YAML="$HOME/tmp/protected_superset_dbs.yaml"
+cat <<EOF > "$TEMP_YAML"
+databases:
+  - database_name: Postgres_Project_DB
+    sqlalchemy_uri: postgresql://${POSTGRES_DEFAULT_USER}:${PROJECT_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${SUPERSET_METADATA_DATABASE}
+    extra: "{}"
+    allow_dml: true
+  - database_name: Trino_Project_DB
+    sqlalchemy_uri: trino://${PROJECT_USER}:${PROJECT_PASSWORD}@${TRINO_HOST}:8080/iceberg
+    extra: "{\"engine_config\": {\"connect_args\": {\"catalog\": \"iceberg\", \"schema\": \"default\", \"http_scheme\": \"http\", \"s3_endpoint\": \"http://${MINIO_HOST}:${MINIO_PORT}\", \"s3_path_style_access\": ${S3_PATH_STYLE_ACCESS}, \"s3_bucket\": \"${MINIO_ICEBERG_CATALOG_BUCKET}\"}}} "
+    allow_dml: true
 EOF
+
+# Copy YAML file to container
+docker cp "$TEMP_YAML" "$SUPERSET_CONTAINER:/tmp/protected_superset_dbs.yaml"
+
+# Import database connections
+echo "[INFO] Importing database connections..."
+if ! docker exec "$SUPERSET_CONTAINER" /opt/bitnami/superset/venv/bin/superset import-datasources --path /tmp/protected_superset_dbs.yaml 2>&1 | tee import.log; then
+  echo "[ERROR] Failed to import datasources. Check Superset version and supported flags."
+  echo "[INFO] Run 'docker exec $SUPERSET_CONTAINER /opt/bitnami/superset/venv/bin/superset import-datasources --help' for available options."
+  rm -f "$TEMP_YAML"
+  docker exec -u root "$SUPERSET_CONTAINER" rm -f /tmp/protected_superset_dbs.yaml || echo "[WARNING] Failed to remove /tmp/protected_superset_dbs.yaml in container"
+  exit 1
+fi
+
+# Clean up
+rm -f "$TEMP_YAML"
+docker exec -u root "$SUPERSET_CONTAINER" rm -f /tmp/protected_superset_dbs.yaml || echo "[WARNING] Failed to remove /tmp/protected_superset_dbs.yaml in container"
 
 echo "[SUCCESS] Superset DB connections created or updated."

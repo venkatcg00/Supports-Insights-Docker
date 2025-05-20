@@ -9,3 +9,6 @@ jvm.config
 log.properties
 *_bak
 *.jar
+platform_setup/database_setup_sql_scripts/16_user_creation.sql
+import.log
+*.log

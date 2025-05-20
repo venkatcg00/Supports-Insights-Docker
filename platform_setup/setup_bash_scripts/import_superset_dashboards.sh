@@ -26,6 +26,14 @@ else
   exit 1
 fi
 
+# Wait for Superset to be healthy
+echo "[INFO] Waiting for Superset to be healthy..."
+until docker exec "$SUPERSET_CONTAINER" curl -f http://localhost:8088/health > /dev/null 2>&1; do
+  echo "Superset is not healthy yet. Retrying in 5 seconds..."
+  sleep 5
+done
+echo "[INFO] Superset is healthy."
+
 echo "[INFO] Importing dashboards into Superset..."
 
 DASHBOARD_DIRS=(
@@ -42,14 +50,14 @@ for DIR in "${DASHBOARD_DIRS[@]}"; do
         if [ -f \"\$f\" ]; then
           FOUND=1
           echo \"[IMPORTING] \$f\"
-          superset import-dashboards --path \"\$f\"
+          /opt/bitnami/superset/venv/bin/superset import-dashboards --path \"\$f\"
         fi
       done
       if [ \"\$FOUND\" -eq 0 ]; then
-        echo \"[INFO] No dashboards found in \$DIR\"
+        echo \"[INFO] No dashboards found in $DIR\"
       fi
     else
-      echo \"[SKIP] Directory does not exist: \$DIR\"
+      echo \"[SKIP] Directory does not exist: $DIR\"
     fi
   "
 done

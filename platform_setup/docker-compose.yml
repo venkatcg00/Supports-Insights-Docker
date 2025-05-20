@@ -18,6 +18,7 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
+    mem_limit: 1.2g
 
   mongodb:
     image: mongo:6.0
@@ -39,6 +40,7 @@ services:
       timeout: 5s
       retries: 10
       start_period: 120s
+    mem_limit: 1g
 
   minio:
     image: minio/minio:RELEASE.2025-04-22T22-12-26Z
@@ -61,6 +63,7 @@ services:
       timeout: 5s
       retries: 10
       start_period: 15s
+    mem_limit: 512m
 
   kafka:
     image: bitnami/kafka:3.7
@@ -91,6 +94,7 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
+    mem_limit: 1.5g
 
   python:
     build:
@@ -138,13 +142,14 @@ services:
     command: >
       python /app/scripts/python_scripts_orchestrator/data_generator_orchestrator.py
     healthcheck:
-      test: ["CMD", "pgrep", "-f", "data_generator_orchestrator.py"]
+      test: ["CMD", "curl", "-f", "localhost:1212"]
       interval: 5s
       timeout: 5s
       retries: 10
       start_period: 30s
     networks:
       - data-network
+    mem_limit: 1g
 
   spark:
     build:
@@ -163,6 +168,7 @@ services:
     ports:
       - "7077:7077"
       - "1234:8080"
+      - "4040-4050:4040-4050"
     volumes:
       - ./jars/postgresql-jdbc.jar:/opt/bitnami/spark/jars/postgresql-jdbc.jar:ro
     networks:
@@ -173,6 +179,8 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
+    mem_limit: 2g
+    command: /opt/bitnami/spark/sbin/start-master.sh
 
   airflow:
     build:
@@ -204,6 +212,8 @@ services:
       AIRFLOW_DATABASE_PASSWORD: "${PROJECT_PASSWORD}"
       AIRFLOW_DATABASE_HOST: "${POSTGRES_HOST}"
       AIRFLOW_DATABASE_PORT_NUMBER: "${POSTGRES_PORT}"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_DEFAULT_USER}:${PROJECT_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${AIRFLOW_METADATA_DATABASE}
+      AIRFLOW__DATABASE__CONN_MAX_AGE: 30
     volumes:
       - ../support_insights/data_loaders:/opt/airflow/dags/support_insights
       - ../clickstream_telemetry/data_loaders:/opt/airflow/dags/clickstream_telemetry
@@ -215,9 +225,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-      start_period: 30s
+      start_period: 60s
     networks:
       - data-network
+    mem_limit: 1.5g
 
   trino:
     image: trinodb/trino:475
@@ -249,7 +260,7 @@ services:
     - ./trino/etc:/etc/trino:ro
     - ./trino/etc:/usr/lib/trino/etc/:ro
     - ./jars/postgresql-jdbc.jar:/usr/lib/trino/plugin/iceberg/postgresql-jdbc.jar:ro
-    - ./docker_entrypoint_scripts/trino_startup.sh:/trino_startup.sh:ro
+    - ./entrypoint_scripts/trino_startup.sh:/trino_startup.sh:ro
     command: >
       /bin/bash /trino_startup.sh
     networks:
@@ -260,6 +271,7 @@ services:
       timeout: 5s
       retries: 10
       start_period: 60s
+    mem_limit: 1.2g
 
   superset:
     build:
@@ -293,16 +305,50 @@ services:
     volumes:
       - ../clickstream_telemetry/data_dashboards:/app/bitnami/superset_home/clickstream_telemetry/dashboards
       - ../support_insights/data_dashboards:/app/bitnami/superset_home/support_insights/dashboards
-      - ./docker_entrypoint_scripts/superset_startup.sh:/superset_startup.sh
+      - ./entrypoint_scripts/superset_startup.sh:/app/superset_startup.sh
     networks:
       - data-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    mem_limit: 1g
+
+  dbt:
+    build:
+      context: ../platform_setup
+      dockerfile: ../platform_setup/dockerfiles/dbt.dockerfile
+    container_name: dbt
+    restart: always
+    depends_on:
+      trino:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      TRINO_HOST: "${TRINO_HOST}"
+      ICEBERG_FILE_FORMAT: "${ICEBERG_FILE_FORMAT}"
+      MINIO_HOST: "${MINIO_HOST}"
+      MINIO_PORT: "${MINIO_PORT}"
+      MINIO_ICEBERG_CATALOG_BUCKET: "${MINIO_ICEBERG_CATALOG_BUCKET}"
+      S3_PATH_STYLE_ACCESS: "${S3_PATH_STYLE_ACCESS}"
+      AIRFLOW_FERNET_KEY: "${AIRFLOW_FERNET_KEY}"
+      AIRFLOW_METADATA_DATABASE: "${AIRFLOW_METADATA_DATABASE}"
+    volumes:
+      - ../platform_setup/dbt_project/dbt_project.yml:/app/dbt_project.yml
+      - ../clickstream_telemetry/data_loaders/dbt_models:/app/dbt_project/models
+    networks:
+      - data-network
+    healthcheck:
+      test: ["CMD", "dbt", "debug"]
       interval: 10s
       timeout: 5s
-      retries: 10
-      start_period: 60s
-
+      retries: 5
+      start_period: 30s
+    mem_limit: 512m
+    command: ["bash", "-c", "dbt debug && tail -f /dev/null"]
 volumes:
   postgres_data:
   mongodb_data:

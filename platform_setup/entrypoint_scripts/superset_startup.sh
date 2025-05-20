@@ -26,18 +26,28 @@ export SUPERSET_SECRET_KEY="${PROJECT_PASSWORD}"
 echo "Running Superset database upgrade..."
 /opt/bitnami/superset/venv/bin/superset db upgrade
 
-# Create an admin user
-echo "Creating Superset admin user..."
-/opt/bitnami/superset/venv/bin/superset fab create-admin \
-  --username "${PROJECT_USER}" \
-  --firstname "${FIRST_NAME}" \
-  --lastname "${LAST_NAME}" \
-  --email "${EMAIL_ADDRESS}" \
-  --password "${PROJECT_PASSWORD}"
+# Check if admin user exists
+echo "Checking for existing admin user..."
+if /opt/bitnami/superset/venv/bin/superset fab list-users | grep -q "${PROJECT_USER}"; then
+  echo "Admin user ${PROJECT_USER} already exists. Skipping creation."
+else
+  echo "Creating Superset admin user..."
+  /opt/bitnami/superset/venv/bin/superset fab create-admin \
+    --username "${PROJECT_USER}" \
+    --firstname "${FIRST_NAME}" \
+    --lastname "${LAST_NAME}" \
+    --email "${EMAIL_ADDRESS}" \
+    --password "${PROJECT_PASSWORD}"
+fi
 
-# Initialize Superset
-echo "Initializing Superset..."
-/opt/bitnami/superset/venv/bin/superset init
+# Initialize Superset (run only if not initialized)
+if [ ! -f "/app/superset_home/.init-done" ]; then
+  echo "Initializing Superset..."
+  /opt/bitnami/superset/venv/bin/superset init
+  touch /app/superset_home/.init-done
+else
+  echo "Superset already initialized. Skipping init."
+fi
 
 # Start Superset
 echo "Starting Superset server..."

@@ -1,29 +1,24 @@
-FROM python:3.9-slim
+FROM python:3.12.10-slim
 
-# Install system dependencies
+# Install system dependencies in a single layer and clean up
 RUN apt-get update && \
-    apt-get install -y openjdk-17-jdk netcat-openbsd curl python3-lxml && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+    apt-get install -y --no-install-recommends \
+    netcat-openbsd \
+    curl \
+    python3-lxml && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/*
 
-# Set Java environment variables
-ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-ENV PATH=$JAVA_HOME/bin:$PATH
-
-# Pre-install Python packages
+# Pre-install Python packages with version locking
 RUN pip install --no-cache-dir \
-    pandas \
-    sqlalchemy \
-    psycopg2-binary \
-    pymongo \
-    aiohttp \
-    polars \
-    boto3 \
-    psutil \
-    requests \
-    confluent-kafka \
-    avro-python3 \
-    pyarrow \
-    pyiceberg \
-    trino
+    sqlalchemy==2.0.35 \
+    psycopg2-binary==2.9.10 \
+    pymongo==4.10.1 \
+    aiohttp==3.10.10 \
+    boto3==1.35.39 \
+    confluent-kafka==2.5.3 \
+    avro-python3==1.10.2 && \
+    # Clean up pip cache and temporary files
+    rm -rf /root/.cache/pip/* /tmp/*
 
 WORKDIR /app
