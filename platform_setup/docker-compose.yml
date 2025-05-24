@@ -96,15 +96,13 @@ services:
       start_period: 30s
     mem_limit: 1.5g
 
-  python:
+  orchestration_ui:
     build:
       context: ../platform_setup
-      dockerfile: ../platform_setup/dockerfiles/python.dockerfile
-    container_name: python
+      dockerfile: ../platform_setup/dockerfiles/orchestration_ui.dockerfile
+    container_name: orchestration_ui
     restart: always
     depends_on:
-      postgresql:
-        condition: service_healthy
       mongodb:
         condition: service_healthy
       kafka:
@@ -112,11 +110,6 @@ services:
       minio:
         condition: service_healthy
     environment:
-      POSTGRES_HOST: "${POSTGRES_HOST}"
-      POSTGRES_PORT: "${POSTGRES_PORT}"
-      POSTGRES_DATABASE_NAME: "${POSTGRES_DATABASE_NAME}"
-      DB_USER: "${PROJECT_USER}"
-      DB_PASSWORD: "${PROJECT_PASSWORD}"
       MONGO_HOST: "${MONGO_HOST}"
       MONGO_PORT: "${MONGO_PORT}"
       MONGO_USER: "${PROJECT_USER}"
@@ -132,15 +125,21 @@ services:
       KAFKA_CLICKSTREAM_USER_BEHAVIOUR_TOPIC: "${KAFKA_CLICKSTREAM_USER_BEHAVIOUR_TOPIC}"
       KAFKA_TELEMETRY_VEHICLE_STATS_TOPIC: "${KAFKA_TELEMETRY_VEHICLE_STATS_TOPIC}"
       KAFKA_ANALYTICS_SESSION_DURATION_TOPIC: "${KAFKA_ANALYTICS_SESSION_DURATION_TOPIC}"
+      KAFKA_CLIENT_BETA_STORAGE_TOPIC: "${KAFKA_CLIENT_BETA_STORAGE_TOPIC}"
+      CHUNK_SIZE: 10000
+      SQLITE_DB_FILE: "/app/storage/orchestrator.db"
     volumes:
-      - python_logs:/app/logs
+      - orchestration_ui_data:/app
       - ../support_insights/data_generators:/app/scripts/support_insights
-      - ../clickstream_telemetry/data_generators:/app/scripts/clickstream-telemetry
+      - ../support_insights/data_generator_tests:/app/tests/support_insights_tests
+      - ../clickstream_telemetry/data_generators:/app/scripts/clickstream_telemetry
+      - ../clickstream_telemetry/data_generator_tests:/app/tests/clickstream_telemetry
       - ./python_scripts_orchestrator:/app/scripts/python_scripts_orchestrator
+      - ./entrypoint_scripts/orchestration_ui_startup.sh:/app/orchestration_ui_startup.sh
+      - ./entrypoint_scripts/sqlite3_db_setup.sql:/app/sqlite3_db_setup.sql
     ports:
       - "1212:1212"
-    command: >
-      python /app/scripts/python_scripts_orchestrator/data_generator_orchestrator.py
+    command: bash /app/orchestration_ui_startup.sh
     healthcheck:
       test: ["CMD", "curl", "-f", "localhost:1212"]
       interval: 5s
@@ -354,7 +353,7 @@ volumes:
   mongodb_data:
   minio_data:
   kafka_data:
-  python_logs:
+  orchestration_ui_data:
   airflow_logs:
 
 networks:

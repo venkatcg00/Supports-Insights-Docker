@@ -1,361 +1,246 @@
+"""
+Orchestrates data generator scripts, providing a web interface to monitor and control execution.
+Discovers scripts in /app/scripts, runs them with random inputs, and stores run history and checkpoints
+in SQLite. Supports UI enhancements for run history, log downloads, and orchestrator log access.
+
+Product: Data Generator Suite
+Version: 1.0.0
+"""
 import asyncio
+import os
+import sys
 import random
 import logging
+import sqlite3
 import subprocess
+import traceback
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from aiohttp import web
-import os
+import time
+import glob
+from urllib.parse import quote
 
-# Dynamic log file name with timestamp
-log_file_name = f"/app/logs/data_generator_orchestrator_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.log"
+# Logger
+SCRIPT_LOGGER = logging.getLogger(__name__)
+SCRIPT_LOGGER.setLevel(logging.INFO)
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.FileHandler(log_file_name),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
+# Use orchestrator-provided log file or fallback
+log_file = f"/app/logs/data_generator_orchestrator_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.log"
+formatter = logging.Formatter("timestamp=%(asctime)s level=%(levelname)s script=%(name)s message=%(message)s")
+file_handler = logging.FileHandler(log_file)
+file_handler.setFormatter(formatter)
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setFormatter(formatter)
+SCRIPT_LOGGER.addHandler(file_handler)
+SCRIPT_LOGGER.addHandler(console_handler)
 
-# List of expected environment variables
-EXPECTED_ENV_VARS = [
-    "POSTGRES_HOST",
-    "POSTGRES_PORT",
-    "POSTGRES_DATABASE_NAME",
-    "DB_USER",
-    "DB_PASSWORD",
-    "MONGO_HOST",
-    "MONGO_PORT",
-    "MONGO_USER",
-    "MONGO_PASSWORD",
-    "MONGO_DB",
-    "MINIO_HOST",
-    "MINIO_PORT",
-    "MINIO_USER",
-    "MINIO_PASSWORD",
-    "MINIO_CLIENT_GAMMA_STORAGE_BUCKET",
-    "MINIO_CLICKSTREAM_TELEMETRY_BUCKET",
-    "KAFKA_BOOTSTRAP_SERVERS",
-    "KAFKA_CLICKSTREAM_USER_BEHAVIOUR_TOPIC",
-    "KAFKA_TELEMETRY_VEHICLE_STATS_TOPIC",
-    "KAFKA_ANALYTICS_SESSION_DURATION_TOPIC"
-]
+# Suppress aiohttp.access logs at INFO level
+logging.getLogger("aiohttp.access").setLevel(logging.WARNING)
 
 # Global status dictionary to track script execution
 script_status: Dict[str, Dict[str, Any]] = {}
 
-# HTML template with fixed tooltip, wider script name column, and Python icon
-HTML_TEMPLATE = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="refresh" content="15">
-    <title>Data Generator Workflow Monitor</title>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
-    <style>
-        :root {{
-            --mint-primary: #A2D6C3;
-            --mint-light: #B6E0CF;
-            --mint-hover: #C9E8DC;
-            --mint-border: #8BC7B0;
-            --background: #E6F2ED;
-            --text-dark: #1A3C34;
-            --text-light: #fff;
-            --start-btn: #A8D5BA;
-            --start-btn-hover: #92C4A6;
-            --stop-btn: #FF9999;
-            --stop-btn-hover: #FF8080;
-        }}
-        body {{
-            font-family: 'Roboto', sans-serif;
-            margin: 30px;
-            background: linear-gradient(135deg, var(--background), #D9EDE5);
-            color: var(--text-dark);
-            position: relative;
-        }}
-        h1 {{
-            text-align: center;
-            font-weight: 500;
-            font-size: 2.4em;
-            margin-bottom: 40px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }}
-        h2 {{
-            font-weight: 400;
-            font-size: 1.6em;
-            margin: 30px 0 15px;
-        }}
-        table {{
-            width: 100%;
-            border-spacing: 0;
-            margin-top: 10px;
-            background: linear-gradient(135deg, rgba(162, 214, 195, 0.9), rgba(162, 214, 195, 0.7));
-            backdrop-filter: blur(10px);
-            box-shadow: 0 6px 16px rgba(0,0,0,0.2);
-            animation: fadeIn 0.5s ease-in;
-            table-layout: fixed;
-            border-radius: 10px;
-            overflow: hidden;
-        }}
-        th, td {{
-            padding: 14px 15px;
-            text-align: left;
-            border: 1px solid var(--mint-border);
-        }}
-        th {{
-            background: linear-gradient(135deg, var(--mint-primary), var(--mint-border));
-            color: var(--text-light);
-            font-weight: 500;
-            text-transform: uppercase;
-            font-size: 0.9em;
-            letter-spacing: 0.5px;
-            position: sticky;
-            top: 0;
-            z-index: 1;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }}
-        th:hover {{
-            transform: scale(1.02);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        }}
-        th:first-child, tr:last-child td:first-child {{ border-left: none; }}
-        th:last-child, tr:last-child td:last-child {{ border-right: none; }}
-        tr:first-child th {{ border-top: none; }}
-        tr:last-child td {{ border-bottom: none; }}
-        th:first-child {{ border-top-left-radius: 10px; }}
-        th:last-child {{ border-top-right-radius: 10px; }}
-        tr:last-child td:first-child {{ border-bottom-left-radius: 10px; }}
-        tr:last-child td:last-child {{ border-bottom-right-radius: 10px; }}
-        th:nth-child(1), td:nth-child(1) {{ width: 30%; padding-right: 10px; position: relative; }}
-        th:nth-child(2), td:nth-child(2) {{ width: 8%; }}
-        th:nth-child(3), td:nth-child(3) {{ width: 10%; }}
-        th:nth-child(4), td:nth-child(4) {{ width: 14%; }}
-        th:nth-child(5), td:nth-child(5) {{ width: 7%; }}
-        th:nth-child(6), td:nth-child(6) {{ width: 7%; }}
-        th:nth-child(7), td:nth-child(7) {{ width: 9%; }}
-        th:nth-child(8), td:nth-child(8) {{ width: 8%; }}
-        th:nth-child(9), td:nth-child(9) {{ width: 7%; }}
-        td:nth-child(1) span.script-name {{
-            display: inline-block;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            max-width: calc(100% - 20px);
-            position: relative;
-            vertical-align: middle;
-            transition: text-shadow 0.2s ease;
-        }}
-        td:nth-child(1) span.script-name::before {{
-            content: '🐍';
-            display: inline-block;
-            margin-right: 8px;
-            font-size: 1.2em;
-            color: #3776AB;
-            vertical-align: middle;
-        }}
-        td:nth-child(1) span.script-name:hover {{
-            text-shadow: 0 0 5px rgba(0,0,0,0.3);
-        }}
-        td:nth-child(1) span.script-name:hover .tooltip {{
-            visibility: visible;
-            opacity: 1;
-            transition: opacity 0.2s ease 0.3s, visibility 0s linear 0.3s;
-        }}
-        td:nth-child(1) .tooltip {{
-            visibility: hidden;
-            opacity: 0;
-            position: absolute;
-            background: rgba(255, 255, 255, 0.95);
-            color: var(--text-dark);
-            padding: 8px 12px;
-            border-radius: 6px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-            z-index: 10;
-            left: 0;
-            top: 100%;
-            white-space: normal;
-            max-width: 300px;
-            transition: opacity 0.2s ease, visibility 0s linear;
-        }}
-        td:not(:nth-child(1)) {{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
-        tr:nth-child(even) {{ background-color: var(--mint-light); }}
-        tr:hover {{
-            background-color: var(--mint-hover);
-            transform: scale(1.005);
-            transition: background-color 0.2s ease, transform 0.2s ease;
-        }}
-        .status-running {{ color: #FFA500; font-weight: 500; }}
-        .status-completed {{ color: #008000; font-weight: 500; }}
-        .status-failed {{ color: #FF0000; font-weight: 500; }}
-        .status-stopped {{ color: #666; font-weight: 500; }}
-        .status-not-found {{ color: #666; font-weight: 500; }}
-        td.status-running::before, td.status-completed::before, td.status-failed::before, td.status-stopped::before, td.status-not-found::before {{
-            content: '';
-            display: inline-block;
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            margin-right: 8px;
-            vertical-align: middle;
-        }}
-        td.status-running::before {{ background-color: #FFA500; }}
-        td.status-completed::before {{ background-color: #008000; }}
-        td.status-failed::before {{ background-color: #FF0000; }}
-        td.status-stopped::before {{ background-color: #666; }}
-        td.status-not-found::before {{ background-color: #666; }}
-        a {{ color: #0066cc; text-decoration: none; transition: color 0.2s ease; }}
-        a:hover {{ color: #0033cc; text-decoration: underline; }}
-        .toggle-btn {{
-            padding: 8px 12px;
-            border: none;
-            cursor: pointer;
-            font-size: 0.9em;
-            border-radius: 6px;
-            width: 100%;
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.7));
-            color: #fff;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-            border: 1px solid rgba(255, 255, 255, 0.5);
-        }}
-        .start-btn {{
-            background: linear-gradient(135deg, var(--start-btn), var(--start-btn-hover));
-        }}
-        .stop-btn {{
-            background: linear-gradient(135deg, var(--stop-btn), var(--stop-btn-hover));
-        }}
-        .toggle-btn:hover {{
-            transform: scale(1.05);
-            box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
-        }}
-        .container {{ max-width: 1600px; margin: 0 auto; position: relative; }}
-        .loading {{
-            display: none;
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 40px;
-            height: 40px;
-            border: 4px solid var(--mint-border);
-            border-top: 4px solid var(--text-dark);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            z-index: 1000;
-        }}
-        @keyframes fadeIn {{
-            from {{ opacity: 0; transform: translateY(10px); }}
-            to {{ opacity: 1; transform: translateY(0); }}
-        }}
-        @keyframes spin {{
-            0% {{ transform: translate(-50%, -50%) rotate(0deg); }}
-            100% {{ transform: translate(-50%, -50%) rotate(360deg); }}
-        }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Data Generator Workflow Monitor</h1>
-        <div class="loading" id="loadingSpinner"></div>
-        {tables}
-    </div>
-    <script>
-        function updateCountdown() {{
-            const now = new Date().getTime() / 1000;
-            document.querySelectorAll('.countdown').forEach(cell => {{
-                const nextRun = parseFloat(cell.getAttribute('data-next-run'));
-                const secondsLeft = isNaN(nextRun) ? 'N/A' : Math.max(0, Math.round(nextRun - now));
-                cell.textContent = secondsLeft;
-            }});
-        }}
-        setInterval(updateCountdown, 1000);
-        updateCountdown();
+def setup_logging(log_file: str) -> None:
+    """Configure logging for script events.
 
-        async function toggleScript(scriptName, action) {{
-            console.log('Toggling script:', scriptName, 'with action:', action);
-            const spinner = document.getElementById('loadingSpinner');
-            spinner.style.display = 'block';
-            try {{
-                const response = await fetch(`/toggle?script=${{encodeURIComponent(scriptName)}}&action=${{action}}`, {{ method: 'POST' }});
-                if (response.ok) {{
-                    console.log('Toggle successful, reloading page');
-                    location.reload();
-                }} else {{
-                    console.error('Toggle failed:', response.status, response.statusText);
-                    alert('Failed to toggle script: ' + response.statusText);
-                }}
-            }} catch (error) {{
-                console.error('Error during toggle:', error);
-                alert('Error toggling script: ' + error.message);
-            }} finally {{
-                spinner.style.display = 'none';
-            }}
-        }}
-    </script>
-</body>
-</html>
-"""
+    Args:
+        log_file: Path to the log file.
 
-def check_env_vars() -> None:
-    """Check for expected environment variables and log missing ones."""
-    missing_vars = [var for var in EXPECTED_ENV_VARS if var not in os.environ]
-    if missing_vars:
-        logger.warning(f"Missing environment variables: {', '.join(missing_vars)}")
+    Raises:
+        OSError: If log file cannot be created or written to.
+    """
+    SCRIPT_LOGGER.info("----- Setting Up Logging -----")
+    SCRIPT_LOGGER.info("Log file: %s", log_file)
+    SCRIPT_LOGGER.info("-----------------------------")
+
+def cleanup_old_logs() -> None:
+    """Delete log files in /app/logs older than 7 days."""
+    SCRIPT_LOGGER.info("----- Cleaning Up Old Logs -----")
+    log_dir = "/app/logs"
+    threshold = time.time() - 7 * 24 * 3600  # 7 days in seconds
+    deleted = 0
+    SCRIPT_LOGGER.info("Scanning directory: %s, threshold: %s", log_dir, datetime.fromtimestamp(threshold).strftime("%Y-%m-%d %H:%M:%S"))
+    for log_file in glob.glob(f"{log_dir}/*.log"):
+        try:
+            mtime = os.path.getmtime(log_file)
+            if mtime < threshold:
+                os.remove(log_file)
+                deleted += 1
+                SCRIPT_LOGGER.info("Deleted old log file: %s (last modified: %s)", log_file, datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M:%S"))
+        except OSError as e:
+            SCRIPT_LOGGER.error("Failed to delete log file %s: %s\n%s", log_file, str(e), traceback.format_exc())
+    if deleted > 0:
+        SCRIPT_LOGGER.info("Deleted %d old log files", deleted)
     else:
-        logger.info("All expected environment variables are present")
+        SCRIPT_LOGGER.info("No old log files found to delete")
+    SCRIPT_LOGGER.info("-------------------------------")
 
 def normalize_name(name: str) -> str:
-    """Normalize script or folder name by removing underscores, fixing typos, and capitalizing words."""
-    name = name.replace("cleint", "client").replace("vehilce", "vehicle")
-    words = name.replace("-", "_").split("_")
-    return " ".join(word.capitalize() for word in words)
+    """Normalize script or folder name for display.
 
-def discover_scripts() -> None:
-    """Dynamically discover Python scripts in mounted directories."""
+    Args:
+        name: Raw script or folder name.
+
+    Returns:
+        Capitalized name with underscores fixed.
+    """
+    words = name.replace("-", "_").split("_")
+    display_name = " ".join(word.capitalize() for word in words)
+    SCRIPT_LOGGER.debug("Normalized name: %s -> %s", name, display_name)
+    return display_name
+
+def discover_scripts() -> Dict[str, Dict[str, Any]]:
+    """Discover Python scripts in /app/scripts directories.
+
+    Returns:
+        Dictionary of script metadata (path, folder, display name, etc.).
+    """
+    SCRIPT_LOGGER.info("----- Discovering Scripts -----")
     script_dirs = [
         "/app/scripts/support_insights",
-        "/app/scripts/clickstream-telemetry",
+        "/app/scripts/clickstream_telemetry",
         "/app/scripts/python_scripts_orchestrator"
     ]
-    
+    scripts: Dict[str, Dict[str, Any]] = {}
     for script_dir in script_dirs:
         if not os.path.exists(script_dir):
-            logger.warning(f"Directory {script_dir} not found")
+            SCRIPT_LOGGER.info("Directory %s not found", script_dir)
             continue
+        SCRIPT_LOGGER.info("Scanning directory: %s", script_dir)
         for root, _, files in os.walk(script_dir):
             for filename in files:
-                if filename.endswith(".py") and filename not in ["data_generator_orchestrator.py", "allowed_values.py"]:
+                if filename.endswith(".py") and filename not in ["data_generator_orchestrator.py", "db_operations.py"]:
                     script_name = os.path.splitext(filename)[0]
                     display_name = normalize_name(script_name)
                     script_path = os.path.join(root, filename)
                     folder_name = os.path.basename(script_dir)
-                    if script_name not in script_status:
-                        script_status[script_name] = {
-                            "script_path": script_path,
-                            "folder": folder_name,
-                            "display_name": display_name,
-                            "last_run": None,
-                            "last_input": None,
-                            "status": "Stopped",
-                            "last_error": None,
-                            "last_log_file": None,
-                            "last_duration": None,
-                            "next_run": None,
-                            "running": False,
-                            "task": None
-                        }
-                        logger.info(f"Discovered script: {script_path} in folder {folder_name} (display: {display_name})")
+                    scripts[script_name] = {
+                        "script_path": script_path,
+                        "folder": folder_name,
+                        "display_name": display_name,
+                        "last_run": None,
+                        "last_input": None,
+                        "status": "Stopped",
+                        "last_error": None,
+                        "last_log_file": None,
+                        "last_duration": None,
+                        "next_run": None,
+                        "running": False,
+                        "task": None
+                    }
+                    SCRIPT_LOGGER.info(
+                        "Discovered script: name=%s, path=%s, folder=%s, display_name=%s, initial_status=Stopped",
+                        script_name, script_path, folder_name, display_name
+                    )
+    if not scripts:
+        SCRIPT_LOGGER.info("No scripts found in specified directories")
+    else:
+        SCRIPT_LOGGER.info("Total scripts discovered: %d", len(scripts))
+    SCRIPT_LOGGER.info("------------------------------")
+    return scripts
 
-async def run_script(script_name: str, input_value: int) -> None:
-    """Execute a generator script with the given input and update its status."""
+def init_sqlite_db(db_file: str) -> sqlite3.Connection:
+    """Initialize SQLite database connection.
+
+    Args:
+        db_file: Path to SQLite database file.
+
+    Returns:
+        SQLite connection object.
+
+    Raises:
+        sqlite3.Error: If database connection fails.
+    """
+    SCRIPT_LOGGER.info("----- Initializing SQLite Database -----")
+    SCRIPT_LOGGER.info("Connecting to SQLite database: %s", db_file)
+    try:
+        conn = sqlite3.connect(db_file)
+        SCRIPT_LOGGER.info("Successfully connected to SQLite database")
+        SCRIPT_LOGGER.info("---------------------------------------")
+        return conn
+    except sqlite3.Error as e:
+        SCRIPT_LOGGER.error("Failed to connect to SQLite database %s: %s\n%s", db_file, str(e), traceback.format_exc())
+        raise
+
+def save_run_history(
+    conn: sqlite3.Connection,
+    script_name: str,
+    input_value: int,
+    records_generated: int,
+    start_time: datetime,
+    end_time: Optional[datetime],
+    status: str,
+    error_message: Optional[str],
+    log_file: Optional[str]
+) -> None:
+    """Save run details to run_history table.
+
+    Args:
+        conn: SQLite connection.
+        script_name: Name of the script.
+        input_value: Input value for the run.
+        records_generated: Total records generated (including updates).
+        start_time: Run start time.
+        end_time: Run end time (optional).
+        status: Run status (Running, Completed, Failed, Stopped).
+        error_message: Error message if failed (optional).
+        log_file: Path to log file (optional).
+
+    Raises:
+        sqlite3.Error: If database operation fails.
+    """
+    SCRIPT_LOGGER.info("----- Saving Run History for %s -----", script_name)
+    try:
+        duration = (end_time - start_time).total_seconds() if end_time else None
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO run_history (
+                script_name, input_value, records_generated, start_time, end_time,
+                duration, status, error_message, log_file
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                script_name,
+                input_value,
+                records_generated,
+                start_time.strftime("%Y-%m-%d %H:%M:%S"),
+                end_time.strftime("%Y-%m-%d %H:%M:%S") if end_time else None,
+                duration,
+                status,
+                error_message,
+                log_file
+            )
+        )
+        conn.commit()
+        SCRIPT_LOGGER.info(
+            "Saved run history: input=%d, records_generated=%d, status=%s, duration=%s, log_file=%s",
+            input_value, records_generated, status, duration, log_file
+        )
+        SCRIPT_LOGGER.info("------------------------------------")
+    except sqlite3.Error as e:
+        SCRIPT_LOGGER.error("Failed to save run history for %s: %s\n%s", script_name, str(e), traceback.format_exc())
+        raise
+
+async def run_script(script_name: str, input_value: int, script_status: Dict[str, Dict[str, Any]], db_conn: sqlite3.Connection) -> None:
+    """Execute a generator script and update its status.
+
+    Args:
+        script_name: Name of the script.
+        input_value: Input value for the script.
+        script_status: Global script status dictionary.
+        db_conn: SQLite connection for run history.
+
+    Raises:
+        Exception: If script execution fails.
+    """
     script_path = script_status[script_name]["script_path"]
     log_file = f"/app/logs/{script_name}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.log"
-    logger.info(f"Starting {script_name} with input {input_value}, logging to {log_file}")
+    SCRIPT_LOGGER.info("----- Starting Script %s -----", script_name)
+    SCRIPT_LOGGER.info("Script path: %s", script_path)
+    SCRIPT_LOGGER.info("Input value: %d", input_value)
+    SCRIPT_LOGGER.info("Logging to: %s", log_file)
     
     script_status[script_name]["status"] = "Running"
     script_status[script_name]["last_run"] = datetime.now(timezone.utc)
@@ -368,14 +253,12 @@ async def run_script(script_name: str, input_value: int) -> None:
     try:
         env = os.environ.copy()
         env["SCRIPT_LOG_FILE"] = log_file
-        for var in EXPECTED_ENV_VARS:
-            if var in os.environ:
-                env[var] = os.environ[var]
+        SCRIPT_LOGGER.debug("Environment variables prepared for script execution")
 
         if not os.path.isfile(script_path):
             raise FileNotFoundError(f"Script {script_path} not found")
         if not os.access(script_path, os.X_OK):
-            logger.warning(f"Script {script_path} may not be executable")
+            SCRIPT_LOGGER.warning("Script %s may not be executable", script_path)
 
         process = await asyncio.create_subprocess_exec(
             "python", script_path, str(input_value),
@@ -384,207 +267,558 @@ async def run_script(script_name: str, input_value: int) -> None:
             env=env
         )
         stdout, stderr = await process.communicate()
-        
         duration = (datetime.now(timezone.utc) - start_time).total_seconds()
         script_status[script_name]["last_duration"] = round(duration, 2)
 
+        records_generated = input_value  # Placeholder; scripts should report actual count
         if process.returncode == 0:
-            logger.info(f"{script_name} completed successfully in {duration:.2f} seconds")
             script_status[script_name]["status"] = "Completed"
+            SCRIPT_LOGGER.info("%s completed successfully in %.2f seconds", script_name, duration)
+            save_run_history(
+                db_conn, script_name, input_value, records_generated, start_time, datetime.now(timezone.utc),
+                "Completed", None, log_file
+            )
         else:
             error_msg = stderr.decode().strip()
-            logger.error(f"{script_name} failed with error: {error_msg}")
             script_status[script_name]["status"] = "Failed"
             script_status[script_name]["last_error"] = error_msg
+            SCRIPT_LOGGER.error("%s failed with error: %s", script_name, error_msg)
+            save_run_history(
+                db_conn, script_name, input_value, records_generated, start_time, datetime.now(timezone.utc),
+                "Failed", error_msg, log_file
+            )
     except Exception as e:
         duration = (datetime.now(timezone.utc) - start_time).total_seconds()
         script_status[script_name]["last_duration"] = round(duration, 2)
-        logger.error(f"Exception while running {script_name}: {str(e)}")
         script_status[script_name]["status"] = "Failed"
         script_status[script_name]["last_error"] = str(e)
+        SCRIPT_LOGGER.error("Exception while running %s: %s\n%s", script_name, str(e), traceback.format_exc())
+        save_run_history(
+            db_conn, script_name, input_value, 0, start_time, datetime.now(timezone.utc),
+            "Failed", str(e), log_file
+        )
+        raise
+    finally:
+        SCRIPT_LOGGER.info("----------------------------")
 
-async def script_runner(script_name: str) -> None:
-    """Run a script at random intervals with random inputs until stopped."""
-    logger.info(f"Starting script runner for {script_name}")
+async def script_runner(script_name: str, script_status: Dict[str, Dict[str, Any]], db_conn: sqlite3.Connection) -> None:
+    """Run a script at random intervals until stopped.
+
+    Args:
+        script_name: Name of the script.
+        script_status: Global script status dictionary.
+        db_conn: SQLite connection for run history.
+    """
+    SCRIPT_LOGGER.info("----- Starting Script Runner for %s -----", script_name)
     while script_status[script_name]["running"]:
-        input_value = random.randint(100, 100_000)
+        input_value = random.randint(1_000_000, 2_000_000) if random.random() < 0.05 else random.randint(100, 100_000)
         delay = random.randint(30, 300)
+        SCRIPT_LOGGER.info("Generated input_value=%d, delay=%d seconds", input_value, delay)
 
-        await run_script(script_name, input_value)
+        await run_script(script_name, input_value, script_status, db_conn)
         
-        next_run_time = datetime.now(timezone.utc) + timedelta(seconds=delay)
-        script_status[script_name]["next_run"] = next_run_time.timestamp()
-        
-        logger.info(f"{script_name} scheduled to run again in {delay} seconds")
-        await asyncio.sleep(delay)
+        if script_status[script_name]["running"]:  # Only update next_run if still running
+            next_run_time = datetime.now(timezone.utc) + timedelta(seconds=delay)
+            script_status[script_name]["next_run"] = next_run_time.timestamp()
+            SCRIPT_LOGGER.info("%s scheduled to run again at %s", script_name, next_run_time.strftime("%Y-%m-%d %H:%M:%S"))
+            await asyncio.sleep(delay)
     
-    logger.info(f"{script_name} stopped")
     script_status[script_name]["status"] = "Stopped"
-    script_status[script_name]["next_run"] = None
+    # Do not reset next_run to None to allow countdown to continue
+    save_run_history(
+        db_conn, script_name, script_status[script_name]["last_input"] or 0, 0,
+        script_status[script_name]["last_run"] or datetime.now(timezone.utc), datetime.now(timezone.utc),
+        "Stopped", None, script_status[script_name]["last_log_file"]
+    )
+    SCRIPT_LOGGER.info("%s stopped", script_name)
+    SCRIPT_LOGGER.info("-----------------------------------------")
 
 async def index_handler(request: web.Request) -> web.Response:
-    """Handle HTTP GET requests to the root (/), returning the monitor interface."""
+    """Handle GET requests to /, rendering the main monitor interface."""
+    SCRIPT_LOGGER.info("----- Handling Index Request -----")
+    script_status = request.app["script_status"]
+    db_conn = request.app["db_conn"]
     scripts_by_folder = {}
     for script_name, status in script_status.items():
         folder = status["folder"]
         if folder not in scripts_by_folder:
             scripts_by_folder[folder] = []
         scripts_by_folder[folder].append((script_name, status))
+        SCRIPT_LOGGER.debug("Grouped script %s under folder %s", script_name, folder)
     
     tables = ""
-    for folder, scripts in sorted(scripts_by_folder.items()):
+    for folder in sorted(scripts_by_folder):
         display_folder = normalize_name(folder)
         rows = ""
-        for script_name, status in sorted(scripts, key=lambda x: x[0]):
+        for script_name, status in sorted(scripts_by_folder[folder], key=lambda x: x[0]):
             status_class = f"status-{status['status'].lower().replace(' ', '-')}"
-            log_link = f"<a href=\"/logs?file={status['last_log_file']}\">Download</a>" if status['last_log_file'] else "N/A"
-            next_run = status['next_run'] if status['next_run'] else 0
-            
-            last_run_str = (
-                status['last_run'].strftime("%B %d, %Y %H:%M:%S %Z")
-                if status['last_run'] else "N/A"
+            log_link = (
+                f'<a href="/logs?file={quote(status["last_log_file"])}">Download</a>'
+                if status["last_log_file"] and os.path.exists(status["last_log_file"])
+                else '<span style="color: gray;">Download</span>'
             )
+            last_run_str = status["last_run"].strftime("%B %d, %Y %H:%M:%S") if status["last_run"] else "N/A"
+            next_run = status["next_run"] if status["next_run"] else 0
             
-            button = (
-                f"<button class=\"toggle-btn stop-btn\" onclick=\"toggleScript('{script_name}', 'stop')\">Stop</button>"
-                if status["running"] else
-                f"<button class=\"toggle-btn start-btn\" onclick=\"toggleScript('{script_name}', 'start')\">Start</button>"
-            )
-            
-            rows += (
-                f"<tr>"
-                f"<td><span class=\"script-name\">{status['display_name']}<span class=\"tooltip\">{status['display_name']}</span></span></td>"
-                f"<td>{button}</td>"
-                f"<td class=\"{status_class}\">{status['status']}</td>"
-                f"<td>{last_run_str}</td>"
-                f"<td>{status['last_input'] or 'N/A'}</td>"
-                f"<td>{status['last_duration'] or 'N/A'}</td>"
-                f"<td class=\"countdown\" data-next-run=\"{next_run}\">N/A</td>"
-                f"<td>{status['last_error'] or 'None'}</td>"
-                f"<td>{log_link}</td>"
-                f"</tr>"
-            )
+            rows += f"""
+                <tr>
+                    <td style="width: 14%;"><a href="/history?script={script_name}">{status['display_name']}</a></td>
+                    <td style="width: 14%;">
+                        <input type="radio" name="control_{script_name}" value="start" {'checked' if status['running'] else ''} onchange="toggleScript('{script_name}', 'start')"> Start
+                        <input type="radio" name="control_{script_name}" value="stop" {'checked' if not status['running'] else ''} onchange="toggleScript('{script_name}', 'stop')"> Stop
+                    </td>
+                    <td style="width: 8%;" class="{status_class}" id="status-{script_name}">{status['status']}</td>
+                    <td style="width: 14%;">{last_run_str}</td>
+                    <td style="width: 8%;">{status['last_input'] or 'N/A'}</td>
+                    <td style="width: 8%;">{status['last_duration'] or 'N/A'}</td>
+                    <td style="width: 10%;" class="countdown" id="next-run-{script_name}" data-next-run="{next_run}">N/A</td>
+                    <td style="width: 14%;">{status['last_error'] or 'None'}</td>
+                    <td style="width: 10%;">{log_link}</td>
+                </tr>
+            """
         
-        table = (
-            f"<h2>{display_folder}</h2>"
-            f"<table>"
-            f"<tr>"
-            f"<th>Script Name</th>"
-            f"<th>Control</th>"
-            f"<th>Status</th>"
-            f"<th>Last Run</th>"
-            f"<th>Last Input</th>"
-            f"<th>Duration (s)</th>"
-            f"<th>Next Run In (s)</th>"
-            f"<th>Last Error</th>"
-            f"<th>Log File</th>"
-            f"</tr>"
-            f"{rows}"
-            f"</table>"
-        )
-        tables += table
+        tables += f"""
+            <h2>{display_folder}</h2>
+            <table border="1" style="border-collapse: collapse; width: 100%;">
+                <tr>
+                    <th style="width: 14%;">Script Name</th>
+                    <th style="width: 14%;">Control</th>
+                    <th style="width: 8%;">Status</th>
+                    <th style="width: 14%;">Last Run</th>
+                    <th style="width: 8%;">Last Input</th>
+                    <th style="width: 8%;">Duration (s)</th>
+                    <th style="width: 10%;">Time to Next Run</th>
+                    <th style="width: 14%;">Last Error</th>
+                    <th style="width: 10%;">Log</th>
+                </tr>
+                {rows}
+            </table>
+        """
     
     if not tables:
         tables = "<p>No scripts found in any directories.</p>"
     
-    html = HTML_TEMPLATE.format(tables=tables)
+    orchestrator_log = request.app["log_file"]
+    html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Data Generator Workflow Monitor</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; margin: 20px; }}
+                table {{ margin-bottom: 20px; }}
+                th, td {{ padding: 8px; text-align: left; border: 1px solid #ddd; word-wrap: break-word; }}
+                th {{ background-color: #f2f2f2; }}
+                .status-running {{ color: green; }}
+                .status-completed {{ color: blue; }}
+                .status-failed {{ color: red; }}
+                .status-stopped {{ color: gray; }}
+                a {{ text-decoration: none; color: blue; }}
+                a:hover {{ text-decoration: underline; }}
+                button {{ padding: 8px 16px; margin: 5px; cursor: pointer; }}
+            </style>
+            <script>
+                let lastCountdownValues = {{}}; // Store last countdown values for each script
+                function updateCountdown() {{
+                    const now = new Date().getTime() / 1000;
+                    document.querySelectorAll('.countdown').forEach(cell => {{
+                        const scriptName = cell.id.split('-')[2]; // Extract scriptName from "next-run-{{scriptName}}"
+                        const statusCell = document.getElementById(`status-${{scriptName}}`);
+                        const status = statusCell ? statusCell.textContent : 'Stopped';
+                        let nextRun = parseFloat(cell.getAttribute('data-next-run'));
+                        let secondsLeft;
+
+                        if (status === 'Stopped') {{
+                            // Immediately reset countdown to 0 when stopped
+                            secondsLeft = 0;
+                            lastCountdownValues[scriptName] = 0;
+                        }} else if (isNaN(nextRun) || nextRun <= now) {{
+                            secondsLeft = 'N/A';
+                            lastCountdownValues[scriptName] = undefined;
+                        }} else {{
+                            secondsLeft = Math.max(0, Math.round(nextRun - now));
+                            lastCountdownValues[scriptName] = secondsLeft;
+                        }}
+                        cell.textContent = secondsLeft;
+                    }});
+                }}
+                setInterval(updateCountdown, 1000);
+                updateCountdown();
+
+                async function toggleScript(scriptName, action) {{
+                    try {{
+                        const response = await fetch(`/toggle?script=${{encodeURIComponent(scriptName)}}&action=${{action}}`, {{ method: 'GET' }});
+                        if (response.ok) {{
+                            window.location.reload();
+                        }} else {{
+                            alert('Failed to toggle script: ' + response.statusText);
+                        }}
+                    }} catch (error) {{
+                        alert('Error toggling script: ' + error.message);
+                    }}
+                }}
+            </script>
+        </head>
+        <body>
+            <h1>Data Generator Workflow Monitor</h1>
+            <p>
+                <a href="/logs?file={quote(orchestrator_log)}"><button>Download Orchestrator Log</button></a>
+                <button onclick="window.location.reload()">Refresh</button>
+            </p>
+            {tables}
+        </body>
+        </html>
+    """
+    SCRIPT_LOGGER.info("Rendered index page with %d script folders", len(scripts_by_folder))
+    SCRIPT_LOGGER.info("----------------------------------")
+    return web.Response(text=html, content_type="text/html")
+
+async def history_handler(request: web.Request) -> web.Response:
+    """Handle GET requests to /history, showing run history for a script."""
+    SCRIPT_LOGGER.info("----- Handling History Request -----")
+    script_name = request.query.get("script")
+    limit = int(request.query.get("limit", "5"))
+    if limit not in [5, 10, 25, 50, 100]:
+        limit = 5
+    SCRIPT_LOGGER.info("Script name: %s, limit: %d", script_name, limit)
+    
+    script_status = request.app["script_status"]
+    if not script_name:
+        SCRIPT_LOGGER.error("Missing script name in history request")
+        raise web.HTTPBadRequest(text="Missing script name")
+    
+    if script_name not in script_status:
+        display_name = normalize_name(script_name)
+        html = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Run History - {display_name}</title>
+                <style>
+                    body {{ font-family: Arial, sans-serif; margin: 20px; }}
+                    a {{ text-decoration: none; color: blue; }}
+                    a:hover {{ text-decoration: underline; }}
+                    button {{ padding: 8px 16px; margin: 5px; cursor: pointer; }}
+                </style>
+                <script>
+                    function refreshPage() {{
+                        window.location.reload();
+                    }}
+                </script>
+            </head>
+            <body>
+                <p>
+                    <a href="/">Back to Main Page</a>
+                    <button onclick="refreshPage()">Refresh</button>
+                </p>
+                <h2>Run History for {display_name}</h2>
+                <p>Script not found. It may not have been discovered yet.</p>
+            </body>
+            </html>
+        """
+        SCRIPT_LOGGER.info("Script %s not found, returning error page", script_name)
+        SCRIPT_LOGGER.info("------------------------------------")
+        return web.Response(text=html, content_type="text/html")
+    
+    db_conn = request.app["db_conn"]
+    try:
+        cursor = db_conn.cursor()
+        # Summary
+        cursor.execute(
+            """
+            SELECT
+                COUNT(*) as total_runs,
+                SUM(CASE WHEN status = 'Completed' THEN 1 ELSE 0 END) as successful_runs,
+                SUM(CASE WHEN status = 'Failed' THEN 1 ELSE 0 END) as failed_runs,
+                AVG(records_generated) as avg_records
+            FROM run_history
+            WHERE script_name = ?
+            """,
+            (script_name,)
+        )
+        summary = cursor.fetchone()
+        total_runs, successful_runs, failed_runs, avg_records = summary
+        avg_records = avg_records if avg_records is not None else 0.0
+        SCRIPT_LOGGER.info(
+            "Run history summary for %s: total_runs=%d, successful_runs=%d, failed_runs=%d, avg_records=%.2f",
+            script_name, total_runs, successful_runs, failed_runs, avg_records
+        )
+        
+        # History
+        cursor.execute(
+            """
+            SELECT run_id, input_value, records_generated, start_time, end_time,
+                   duration, status, error_message, log_file
+            FROM run_history
+            WHERE script_name = ?
+            ORDER BY start_time DESC
+            LIMIT ?
+            """,
+            (script_name, limit)
+        )
+        runs = cursor.fetchall()
+        SCRIPT_LOGGER.info("Fetched %d run history entries for %s", len(runs), script_name)
+    except sqlite3.Error as e:
+        SCRIPT_LOGGER.error("Failed to fetch run history for %s: %s\n%s", script_name, str(e), traceback.format_exc())
+        raise web.HTTPInternalServerError(text="Database error")
+    
+    summary_html = f"""
+        <h2>Run History for {normalize_name(script_name)}</h2>
+        <p>Total Runs: {total_runs}</p>
+        <p>Successful Runs: {successful_runs}</p>
+        <p>Failed Runs: {failed_runs}</p>
+        <p>Average Records per Run: {avg_records:.2f}</p>
+    """
+    
+    filter_html = """
+        <form action="/history" method="get">
+            <input type="hidden" name="script" value="{script_name}">
+            <label for="limit">Show runs: </label>
+            <select name="limit" onchange="this.form.submit()">
+                <option value="5" {selected_5}>5</option>
+                <option value="10" {selected_10}>10</option>
+                <option value="25" {selected_25}>25</option>
+                <option value="50" {selected_50}>50</option>
+                <option value="100" {selected_100}>100</option>
+            </select>
+        </form>
+    """.format(
+        script_name=script_name,
+        selected_5='selected' if limit == 5 else '',
+        selected_10='selected' if limit == 10 else '',
+        selected_25='selected' if limit == 25 else '',
+        selected_50='selected' if limit == 50 else '',
+        selected_100='selected' if limit == 100 else ''
+    )
+    
+    rows = ""
+    if not runs:
+        rows = "<tr><td colspan='9'>No run history available.</td></tr>"
+    else:
+        for run in runs:
+            run_id, input_value, records_generated, start_time, end_time, duration, status, error_message, log_file = run
+            status_class = f"status-{status.lower().replace(' ', '-')}"
+            log_link = f'<a href="/logs?file={quote(log_file)}">Download</a>' if log_file and os.path.exists(log_file) else '<span style="color: gray;">Download</span>'
+            duration_str = f"{duration:.2f}" if duration else "N/A"
+            error_message = error_message or "None"
+            rows += f"""
+                <tr>
+                    <td style="width: 5%;">{run_id}</td>
+                    <td style="width: 10%;">{input_value}</td>
+                    <td style="width: 10%;">{records_generated}</td>
+                    <td style="width: 15%;">{start_time}</td>
+                    <td style="width: 15%;">{end_time or 'N/A'}</td>
+                    <td style="width: 10%;">{duration_str}</td>
+                    <td style="width: 10%;" class="{status_class}">{status}</td>
+                    <td style="width: 15%;">{error_message}</td>
+                    <td style="width: 10%;">{log_link}</td>
+                </tr>
+            """
+    
+    table = f"""
+        <table border="1" style="border-collapse: collapse; width: 100%;">
+            <tr>
+                <th style="width: 5%;">Run ID</th>
+                <th style="width: 10%;">Input Value</th>
+                <th style="width: 10%;">Records Generated</th>
+                <th style="width: 15%;">Start Time</th>
+                <th style="width: 15%;">End Time</th>
+                <th style="width: 10%;">Duration (s)</th>
+                <th style="width: 10%;">Status</th>
+                <th style="width: 15%;">Error Message</th>
+                <th style="width: 10%;">Log</th>
+            </tr>
+            {rows}
+        </table>
+    """
+    
+    html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Run History - {normalize_name(script_name)}</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; margin: 20px; }}
+                table {{ margin-top: 20px; margin-bottom: 20px; }}
+                th, td {{ padding: 8px; text-align: left; border: 1px solid #ddd; word-wrap: break-word; }}
+                th {{ background-color: #f2f2f2; }}
+                .status-running {{ color: green; }}
+                .status-completed {{ color: blue; }}
+                .status-failed {{ color: red; }}
+                .status-stopped {{ color: gray; }}
+                a {{ text-decoration: none; color: blue; }}
+                a:hover {{ text-decoration: underline; }}
+                button {{ padding: 8px 16px; margin: 5px; cursor: pointer; }}
+            </style>
+            <script>
+                function refreshPage() {{
+                    window.location.reload();
+                }}
+            </script>
+        </head>
+        <body>
+            <p>
+                <a href="/">Back to Main Page</a>
+                <button onclick="refreshPage()">Refresh</button>
+            </p>
+            {summary_html}
+            {filter_html}
+            {table}
+        </body>
+        </html>
+    """
+    SCRIPT_LOGGER.info("Rendered history page for %s with %d run entries", script_name, len(runs))
+    SCRIPT_LOGGER.info("------------------------------------")
     return web.Response(text=html, content_type="text/html")
 
 async def log_handler(request: web.Request) -> web.Response:
-    """Handle HTTP GET requests to /logs, serving the requested log file."""
+    """Handle GET requests to /logs, serving the requested log file."""
+    SCRIPT_LOGGER.info("----- Handling Log Request -----")
     file_path = request.query.get("file")
     if not file_path or not os.path.exists(file_path) or not file_path.startswith("/app/logs/"):
+        SCRIPT_LOGGER.error("Log file not found or invalid path: %s", file_path)
         raise web.HTTPNotFound(text="Log file not found or invalid path")
     
-    return web.FileResponse(
-        path=file_path,
-        headers={
-            "Content-Disposition": f"attachment; filename={os.path.basename(file_path)}"
-        }
-    )
+    try:
+        response = web.FileResponse(
+            path=file_path,
+            headers={"Content-Disposition": f"attachment; filename={os.path.basename(file_path)}"}
+        )
+        SCRIPT_LOGGER.info("Successfully served log file: %s", file_path)
+        SCRIPT_LOGGER.info("--------------------------------")
+        return response
+    except Exception as e:
+        SCRIPT_LOGGER.error("Error serving log file %s: %s\n%s", file_path, str(e), traceback.format_exc())
+        raise web.HTTPInternalServerError(text=f"Error serving log file: {str(e)}")
 
 async def favicon_handler(request: web.Request) -> web.Response:
     """Handle requests for favicon.ico."""
+    SCRIPT_LOGGER.info("Handling favicon request, returning 404")
     raise web.HTTPNotFound()
 
 async def status_handler(request: web.Request) -> web.Response:
-    """Handle HTTP GET requests to /status, returning the current status as JSON."""
-    return web.json_response({k: {key: val for key, val in v.items() if key != "task"} for k, v in script_status.items()})
+    """Handle GET requests to /status, returning current script status as JSON."""
+    SCRIPT_LOGGER.info("----- Handling Status Request -----")
+    script_status = request.app["script_status"]
+    response = web.json_response({k: {key: val for key, val in v.items() if key != "task"} for k, v in script_status.items()})
+    SCRIPT_LOGGER.info("Returned status for %d scripts", len(script_status))
+    SCRIPT_LOGGER.info("-----------------------------------")
+    return response
 
 async def toggle_handler(request: web.Request) -> web.Response:
-    """Handle HTTP POST requests to /toggle to start or stop a script."""
+    """Handle GET and POST requests to /toggle to start or stop a script."""
+    SCRIPT_LOGGER.info("----- Handling Toggle Request -----")
     script_name = request.query.get("script")
     action = request.query.get("action")
+    SCRIPT_LOGGER.info("Received toggle request: script=%s, action=%s", script_name, action)
     
-    logger.info(f"Received toggle request for script: {script_name}, action: {action}")
+    script_status = request.app["script_status"]
+    db_conn = request.app["db_conn"]
     
     if script_name not in script_status:
-        logger.error(f"Invalid script name: {script_name}")
+        SCRIPT_LOGGER.error("Invalid script name: %s", script_name)
         raise web.HTTPBadRequest(text=f"Invalid script name: {script_name}")
     
     if action not in ["start", "stop"]:
-        logger.error(f"Invalid action: {action}")
+        SCRIPT_LOGGER.error("Invalid action: %s", action)
         raise web.HTTPBadRequest(text=f"Invalid action: {action}")
     
     if action == "start" and not script_status[script_name]["running"]:
-        logger.info(f"Starting {script_name}")
+        SCRIPT_LOGGER.info("Starting %s (previous state: %s)", script_name, script_status[script_name]["status"])
         script_status[script_name]["running"] = True
-        script_status[script_name]["task"] = asyncio.create_task(script_runner(script_name))
-        logger.debug(f"Created task for {script_name}: {script_status[script_name]['task']}")
+        script_status[script_name]["task"] = asyncio.create_task(script_runner(script_name, script_status, db_conn))
+        SCRIPT_LOGGER.info("Script %s started successfully", script_name)
+        SCRIPT_LOGGER.info("-----------------------------------")
         return web.Response(text="Script started")
     
     if action == "stop" and script_status[script_name]["running"]:
-        logger.info(f"Stopping {script_name}")
+        SCRIPT_LOGGER.info("Stopping %s (previous state: %s)", script_name, script_status[script_name]["status"])
         script_status[script_name]["running"] = False
+        script_status[script_name]["status"] = "Stopped"  # Ensure status is set to Stopped immediately
         if script_status[script_name]["task"]:
             script_status[script_name]["task"].cancel()
             try:
                 await script_status[script_name]["task"]
             except asyncio.CancelledError:
-                logger.debug(f"Task for {script_name} cancelled")
+                SCRIPT_LOGGER.info("Task for %s cancelled", script_name)
             script_status[script_name]["task"] = None
-        script_status[script_name]["status"] = "Stopped"
-        script_status[script_name]["next_run"] = None
+        SCRIPT_LOGGER.info("Script %s stopped successfully", script_name)
+        SCRIPT_LOGGER.info("-----------------------------------")
         return web.Response(text="Script stopped")
     
-    logger.info(f"No action taken for {script_name} (action: {action}, running: {script_status[script_name]['running']})")
+    SCRIPT_LOGGER.info("No action taken for %s (action: %s, running: %s)", script_name, action, script_status[script_name]["running"])
+    SCRIPT_LOGGER.info("-----------------------------------")
     return web.Response(text="No action taken")
 
-async def start_http_server() -> None:
-    """Start an HTTP server on port 1212 to expose the monitor interface."""
-    app = web.Application()
-    app.add_routes([
-        web.get('/', index_handler),
-        web.get('/favicon.ico', favicon_handler),
-        web.get('/status', status_handler),
-        web.get('/logs', log_handler),
-        web.post('/toggle', toggle_handler)
-    ])
+async def start_http_server(app: web.Application) -> None:
+    """Start the HTTP server on port 1212.
+
+    Args:
+        app: Aiohttp application instance.
+
+    Raises:
+        Exception: If server startup fails.
+    """
+    SCRIPT_LOGGER.info("----- Starting HTTP Server -----")
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', 1212)
     await site.start()
-    logger.info("HTTP server started on port 1212")
+    SCRIPT_LOGGER.info("HTTP server started on port 1212")
+    SCRIPT_LOGGER.info("Routes configured: %s", ", ".join([str(route) for route in app.router.routes()]))
+    SCRIPT_LOGGER.info("--------------------------------")
 
 async def main() -> None:
     """Main function to start the orchestrator and HTTP server."""
-    logger.info("Starting Data Generator Orchestrator")
+    SCRIPT_LOGGER.info("----- Starting Data Generator Orchestrator -----")
+    SCRIPT_LOGGER.info("Logging to: %s", log_file)
+    SCRIPT_LOGGER.info("Current time: %s", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"))
 
-    # Check environment variables
-    check_env_vars()
+    # Clean up old logs
+    cleanup_old_logs()
 
-    # Discover scripts dynamically
-    discover_scripts()
+    # Discover scripts
+    script_status = discover_scripts()
     
-    if not script_status:
-        logger.warning("No scripts found in specified directories, continuing with empty script list")
+    # Initialize SQLite database
+    db_file = "/app/storage/orchestrator.db"
+    try:
+        db_conn = init_sqlite_db(db_file)
+    except sqlite3.Error as e:
+        SCRIPT_LOGGER.error("Failed to initialize SQLite database: %s\n%s", str(e), traceback.format_exc())
+        sys.exit(1)
 
     # Start HTTP server
-    await start_http_server()
+    app = web.Application()
+    app["script_status"] = script_status
+    app["db_conn"] = db_conn
+    app["log_file"] = log_file
+    app.add_routes([
+        web.get('/', index_handler),
+        web.get('/history', history_handler),
+        web.get('/logs', log_handler),
+        web.get('/status', status_handler),
+        web.get('/favicon.ico', favicon_handler),
+        web.get('/toggle', toggle_handler),
+        web.post('/toggle', toggle_handler)
+    ])
+    
+    try:
+        await start_http_server(app)
+    except Exception as e:
+        SCRIPT_LOGGER.error("Failed to start HTTP server: %s\n%s", str(e), traceback.format_exc())
+        db_conn.close()
+        sys.exit(1)
 
     # Keep the event loop running
-    while True:
-        await asyncio.sleep(3600)
+    try:
+        while True:
+            SCRIPT_LOGGER.info("Event loop active, waiting for next cycle")
+            await asyncio.sleep(3600)
+    finally:
+        db_conn.close()
+        SCRIPT_LOGGER.info("Closed SQLite database connection")
+        SCRIPT_LOGGER.info("-----------------------------------------------")
 
 if __name__ == "__main__":
     asyncio.run(main())

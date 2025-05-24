@@ -1,0 +1,929 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.10, pytest-8.3.3, pluggy-1.6.0 -- /usr/local/bin/python3.12
+cachedir: .pytest_cache
+rootdir: /app
+plugins: mock-3.14.0
+collecting ... collected 21 items
+
+tests/support_insights_tests/test_client_alpha_data_generator.py::test_setup_logging PASSED [  4%]
+tests/support_insights_tests/test_client_alpha_data_generator.py::test_check_dependencies PASSED [  9%]
+tests/support_insights_tests/test_client_alpha_data_generator.py::test_check_dependencies_missing PASSED [ 14%]
+tests/support_insights_tests/test_client_alpha_data_generator.py::test_check_env_vars_all_present PASSED [ 19%]
+tests/support_insights_tests/test_client_alpha_data_generator.py::test_check_env_vars_missing PASSED [ 23%]
+tests/support_insights_tests/test_client_alpha_data_generator.py::test_init_sqlite_checkpoint_db PASSED [ 28%]
+tests/support_insights_tests/test_client_alpha_data_generator.py::test_save_checkpoint PASSED [ 33%]
+tests/support_insights_tests/test_client_alpha_data_generator.py::test_load_checkpoint_exists PASSED [ 38%]
+tests/support_insights_tests/test_client_alpha_data_generator.py::test_load_checkpoint_not_exists PASSED [ 42%]
+tests/support_insights_tests/test_client_alpha_data_generator.py::test_clear_checkpoint PASSED [ 47%]
+tests/support_insights_tests/test_client_alpha_data_generator.py::test_connect_to_mongodb_success FAILED [ 52%]
+tests/support_insights_tests/test_client_alpha_data_generator.py::test_connect_to_mongodb_retry_failure FAILED [ 57%]
+tests/support_insights_tests/test_client_alpha_data_generator.py::test_get_mongodb_collection PASSED [ 61%]
+tests/support_insights_tests/test_client_alpha_data_generator.py::test_get_max_values PASSED [ 66%]
+tests/support_insights_tests/test_client_alpha_data_generator.py::test_insert_record PASSED [ 71%]
+tests/support_insights_tests/test_client_alpha_data_generator.py::test_generate_random_record PASSED [ 76%]
+tests/support_insights_tests/test_client_alpha_data_generator.py::test_generate_random_record_with_null FAILED [ 80%]
+tests/support_insights_tests/test_client_alpha_data_generator.py::test_generate_and_update_records_update_id_range FAILED [ 85%]
+tests/support_insights_tests/test_client_alpha_data_generator.py::test_generate_and_update_records_update_limit FAILED [ 90%]
+tests/support_insights_tests/test_client_alpha_data_generator.py::test_main_full_flow FAILED [ 95%]
+tests/support_insights_tests/test_client_alpha_data_generator.py::test_main_missing_env_vars PASSED [100%]
+
+=================================== FAILURES ===================================
+_______________________ test_connect_to_mongodb_success ________________________
+
+self = <Retrying object at 0x7f1997ad8c50 (stop=<tenacity.stop.stop_after_attempt object at 0x7f1997c30fb0>, wait=<tenacity.w...0x7f1997c31190>, before=<function before_nothing at 0x7f1998bd6e80>, after=<function after_nothing at 0x7f1998bd6fc0>)>
+fn = <function connect_to_mongodb at 0x7f1997c39300>
+args = ('localhost', 27017, 'user', 'pass'), kwargs = {}
+retry_state = <RetryCallState 139747895643312: attempt #3; slept for 10.0; last result: failed (ServerSelectionTimeoutError localhos...7: [Errno 111] Connection refused (configured timeouts: socketTimeoutMS: 20000.0ms, connectTimeoutMS: 20000.0ms)')>]>)>
+do = <tenacity.DoAttempt object at 0x7f1998b3e6f0>
+
+    def __call__(
+        self,
+        fn: t.Callable[..., WrappedFnReturnT],
+        *args: t.Any,
+        **kwargs: t.Any,
+    ) -> WrappedFnReturnT:
+        self.begin()
+    
+        retry_state = RetryCallState(retry_object=self, fn=fn, args=args, kwargs=kwargs)
+        while True:
+            do = self.iter(retry_state=retry_state)
+            if isinstance(do, DoAttempt):
+                try:
+>                   result = fn(*args, **kwargs)
+
+/usr/local/lib/python3.12/site-packages/tenacity/__init__.py:478: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/support_insights/client_alpha_data_generator.py:524: in connect_to_mongodb
+    client.server_info()
+/usr/local/lib/python3.12/site-packages/pymongo/synchronous/mongo_client.py:2125: in server_info
+    self.admin.command(
+/usr/local/lib/python3.12/site-packages/pymongo/_csot.py:119: in csot_wrapper
+    return func(self, *args, **kwargs)
+/usr/local/lib/python3.12/site-packages/pymongo/synchronous/database.py:926: in command
+    with self._client._conn_for_reads(read_preference, session, operation=command_name) as (
+/usr/local/lib/python3.12/site-packages/pymongo/synchronous/mongo_client.py:1701: in _conn_for_reads
+    server = self._select_server(read_preference, session, operation)
+/usr/local/lib/python3.12/site-packages/pymongo/synchronous/mongo_client.py:1649: in _select_server
+    server = topology.select_server(
+/usr/local/lib/python3.12/site-packages/pymongo/synchronous/topology.py:398: in select_server
+    server = self._select_server(
+/usr/local/lib/python3.12/site-packages/pymongo/synchronous/topology.py:376: in _select_server
+    servers = self.select_servers(
+/usr/local/lib/python3.12/site-packages/pymongo/synchronous/topology.py:283: in select_servers
+    server_descriptions = self._select_servers_loop(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Topology <TopologyDescription id: 682de36610bb5484a3bea7a4, topology_type: Unknown, servers: [<ServerDescription ('lo...17: [Errno 111] Connection refused (configured timeouts: socketTimeoutMS: 20000.0ms, connectTimeoutMS: 20000.0ms)')>]>>
+selector = Primary(), timeout = 30, operation = 'buildinfo', operation_id = None
+address = None
+
+    def _select_servers_loop(
+        self,
+        selector: Callable[[Selection], Selection],
+        timeout: float,
+        operation: str,
+        operation_id: Optional[int],
+        address: Optional[_Address],
+    ) -> list[ServerDescription]:
+        """select_servers() guts. Hold the lock when calling this."""
+        now = time.monotonic()
+        end_time = now + timeout
+        logged_waiting = False
+    
+        if _SERVER_SELECTION_LOGGER.isEnabledFor(logging.DEBUG):
+            _debug_log(
+                _SERVER_SELECTION_LOGGER,
+                message=_ServerSelectionStatusMessage.STARTED,
+                selector=selector,
+                operation=operation,
+                operationId=operation_id,
+                topologyDescription=self.description,
+                clientId=self.description._topology_settings._topology_id,
+            )
+    
+        server_descriptions = self._description.apply_selector(
+            selector, address, custom_selector=self._settings.server_selector
+        )
+    
+        while not server_descriptions:
+            # No suitable servers.
+            if timeout == 0 or now > end_time:
+                if _SERVER_SELECTION_LOGGER.isEnabledFor(logging.DEBUG):
+                    _debug_log(
+                        _SERVER_SELECTION_LOGGER,
+                        message=_ServerSelectionStatusMessage.FAILED,
+                        selector=selector,
+                        operation=operation,
+                        operationId=operation_id,
+                        topologyDescription=self.description,
+                        clientId=self.description._topology_settings._topology_id,
+                        failure=self._error_message(selector),
+                    )
+>               raise ServerSelectionTimeoutError(
+                    f"{self._error_message(selector)}, Timeout: {timeout}s, Topology Description: {self.description!r}"
+                )
+E               pymongo.errors.ServerSelectionTimeoutError: localhost:27017: [Errno 111] Connection refused (configured timeouts: socketTimeoutMS: 20000.0ms, connectTimeoutMS: 20000.0ms), Timeout: 30s, Topology Description: <TopologyDescription id: 682de36610bb5484a3bea7a4, topology_type: Unknown, servers: [<ServerDescription ('localhost', 27017) server_type: Unknown, rtt: None, error=AutoReconnect('localhost:27017: [Errno 111] Connection refused (configured timeouts: socketTimeoutMS: 20000.0ms, connectTimeoutMS: 20000.0ms)')>]>
+
+/usr/local/lib/python3.12/site-packages/pymongo/synchronous/topology.py:333: ServerSelectionTimeoutError
+
+The above exception was the direct cause of the following exception:
+
+mock_mongo_client = (<MagicMock id='139747895505120'>, <MagicMock name='mock.__getitem__().__getitem__()' id='139747895551344'>)
+log_capture = ['2025-05-21 14:29:18,820 - client_alpha_data_generator - ERROR - Retrying MongoDB connection (attempt 1)\n', '2025-05-21 14:29:53,903 - client_alpha_data_generator - ERROR - Retrying MongoDB connection (attempt 2)\n']
+
+    def test_connect_to_mongodb_success(mock_mongo_client, log_capture):
+        """Test connect_to_mongodb succeeds."""
+        client, _ = mock_mongo_client
+        # Explicitly patch pymongo.MongoClient to ensure the mock is applied
+        with patch("pymongo.MongoClient", return_value=client) as mock_patch:
+>           result = connect_to_mongodb("localhost", 27017, "user", "pass")
+
+tests/support_insights_tests/test_client_alpha_data_generator.py:193: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/local/lib/python3.12/site-packages/tenacity/__init__.py:336: in wrapped_f
+    return copy(f, *args, **kw)
+/usr/local/lib/python3.12/site-packages/tenacity/__init__.py:475: in __call__
+    do = self.iter(retry_state=retry_state)
+/usr/local/lib/python3.12/site-packages/tenacity/__init__.py:376: in iter
+    result = action(retry_state)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+rs = <RetryCallState 139747895643312: attempt #3; slept for 10.0; last result: failed (ServerSelectionTimeoutError localhos...7: [Errno 111] Connection refused (configured timeouts: socketTimeoutMS: 20000.0ms, connectTimeoutMS: 20000.0ms)')>]>)>
+
+    def exc_check(rs: "RetryCallState") -> None:
+        fut = t.cast(Future, rs.outcome)
+        retry_exc = self.retry_error_cls(fut)
+        if self.reraise:
+            raise retry_exc.reraise()
+>       raise retry_exc from fut.exception()
+E       tenacity.RetryError: RetryError[<Future at 0x7f1997adaa50 state=finished raised ServerSelectionTimeoutError>]
+
+/usr/local/lib/python3.12/site-packages/tenacity/__init__.py:419: RetryError
+------------------------------ Captured log call -------------------------------
+ERROR    client_alpha_data_generator:client_alpha_data_generator.py:494 Retrying MongoDB connection (attempt 1)
+ERROR    client_alpha_data_generator:client_alpha_data_generator.py:494 Retrying MongoDB connection (attempt 2)
+____________________ test_connect_to_mongodb_retry_failure _____________________
+
+self = <Retrying object at 0x7f1997aaa4b0 (stop=<tenacity.stop.stop_after_attempt object at 0x7f1997c30fb0>, wait=<tenacity.w...0x7f1997c31190>, before=<function before_nothing at 0x7f1998bd6e80>, after=<function after_nothing at 0x7f1998bd6fc0>)>
+fn = <function connect_to_mongodb at 0x7f1997c39300>
+args = ('localhost', 27017, 'user', 'pass'), kwargs = {}
+retry_state = <RetryCallState 139747895452800: attempt #3; slept for 10.0; last result: failed (ServerSelectionTimeoutError localhos...7: [Errno 111] Connection refused (configured timeouts: socketTimeoutMS: 20000.0ms, connectTimeoutMS: 20000.0ms)')>]>)>
+do = <tenacity.DoAttempt object at 0x7f1997c332c0>
+
+    def __call__(
+        self,
+        fn: t.Callable[..., WrappedFnReturnT],
+        *args: t.Any,
+        **kwargs: t.Any,
+    ) -> WrappedFnReturnT:
+        self.begin()
+    
+        retry_state = RetryCallState(retry_object=self, fn=fn, args=args, kwargs=kwargs)
+        while True:
+            do = self.iter(retry_state=retry_state)
+            if isinstance(do, DoAttempt):
+                try:
+>                   result = fn(*args, **kwargs)
+
+/usr/local/lib/python3.12/site-packages/tenacity/__init__.py:478: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/support_insights/client_alpha_data_generator.py:524: in connect_to_mongodb
+    client.server_info()
+/usr/local/lib/python3.12/site-packages/pymongo/synchronous/mongo_client.py:2125: in server_info
+    self.admin.command(
+/usr/local/lib/python3.12/site-packages/pymongo/_csot.py:119: in csot_wrapper
+    return func(self, *args, **kwargs)
+/usr/local/lib/python3.12/site-packages/pymongo/synchronous/database.py:926: in command
+    with self._client._conn_for_reads(read_preference, session, operation=command_name) as (
+/usr/local/lib/python3.12/site-packages/pymongo/synchronous/mongo_client.py:1701: in _conn_for_reads
+    server = self._select_server(read_preference, session, operation)
+/usr/local/lib/python3.12/site-packages/pymongo/synchronous/mongo_client.py:1649: in _select_server
+    server = topology.select_server(
+/usr/local/lib/python3.12/site-packages/pymongo/synchronous/topology.py:398: in select_server
+    server = self._select_server(
+/usr/local/lib/python3.12/site-packages/pymongo/synchronous/topology.py:376: in _select_server
+    servers = self.select_servers(
+/usr/local/lib/python3.12/site-packages/pymongo/synchronous/topology.py:283: in select_servers
+    server_descriptions = self._select_servers_loop(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Topology <TopologyDescription id: 682de3cb10bb5484a3bea7a7, topology_type: Unknown, servers: [<ServerDescription ('lo...17: [Errno 111] Connection refused (configured timeouts: socketTimeoutMS: 20000.0ms, connectTimeoutMS: 20000.0ms)')>]>>
+selector = Primary(), timeout = 30, operation = 'buildinfo', operation_id = None
+address = None
+
+    def _select_servers_loop(
+        self,
+        selector: Callable[[Selection], Selection],
+        timeout: float,
+        operation: str,
+        operation_id: Optional[int],
+        address: Optional[_Address],
+    ) -> list[ServerDescription]:
+        """select_servers() guts. Hold the lock when calling this."""
+        now = time.monotonic()
+        end_time = now + timeout
+        logged_waiting = False
+    
+        if _SERVER_SELECTION_LOGGER.isEnabledFor(logging.DEBUG):
+            _debug_log(
+                _SERVER_SELECTION_LOGGER,
+                message=_ServerSelectionStatusMessage.STARTED,
+                selector=selector,
+                operation=operation,
+                operationId=operation_id,
+                topologyDescription=self.description,
+                clientId=self.description._topology_settings._topology_id,
+            )
+    
+        server_descriptions = self._description.apply_selector(
+            selector, address, custom_selector=self._settings.server_selector
+        )
+    
+        while not server_descriptions:
+            # No suitable servers.
+            if timeout == 0 or now > end_time:
+                if _SERVER_SELECTION_LOGGER.isEnabledFor(logging.DEBUG):
+                    _debug_log(
+                        _SERVER_SELECTION_LOGGER,
+                        message=_ServerSelectionStatusMessage.FAILED,
+                        selector=selector,
+                        operation=operation,
+                        operationId=operation_id,
+                        topologyDescription=self.description,
+                        clientId=self.description._topology_settings._topology_id,
+                        failure=self._error_message(selector),
+                    )
+>               raise ServerSelectionTimeoutError(
+                    f"{self._error_message(selector)}, Timeout: {timeout}s, Topology Description: {self.description!r}"
+                )
+E               pymongo.errors.ServerSelectionTimeoutError: localhost:27017: [Errno 111] Connection refused (configured timeouts: socketTimeoutMS: 20000.0ms, connectTimeoutMS: 20000.0ms), Timeout: 30s, Topology Description: <TopologyDescription id: 682de3cb10bb5484a3bea7a7, topology_type: Unknown, servers: [<ServerDescription ('localhost', 27017) server_type: Unknown, rtt: None, error=AutoReconnect('localhost:27017: [Errno 111] Connection refused (configured timeouts: socketTimeoutMS: 20000.0ms, connectTimeoutMS: 20000.0ms)')>]>
+
+/usr/local/lib/python3.12/site-packages/pymongo/synchronous/topology.py:333: ServerSelectionTimeoutError
+
+The above exception was the direct cause of the following exception:
+
+mock_mongo_client = (<MagicMock id='139747895650752'>, <MagicMock name='mock.__getitem__().__getitem__()' id='139747895529104'>)
+log_capture = ['2025-05-21 14:30:59,183 - client_alpha_data_generator - ERROR - Retrying MongoDB connection (attempt 1)\n', '2025-05-21 14:31:34,271 - client_alpha_data_generator - ERROR - Retrying MongoDB connection (attempt 2)\n']
+
+    def test_connect_to_mongodb_retry_failure(mock_mongo_client, log_capture):
+        """Test connect_to_mongodb fails after retries."""
+        client, _ = mock_mongo_client
+        client.server_info.side_effect = ConnectionFailure("Connection failed")
+        with patch("pymongo.MongoClient", return_value=client) as mock_patch:
+            with patch("tenacity.wait.wait_fixed", return_value=wait_fixed(0.1)):  # Reduce wait time for faster testing
+                with pytest.raises(ConnectionFailure):
+>                   connect_to_mongodb("localhost", 27017, "user", "pass")
+
+tests/support_insights_tests/test_client_alpha_data_generator.py:205: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/local/lib/python3.12/site-packages/tenacity/__init__.py:336: in wrapped_f
+    return copy(f, *args, **kw)
+/usr/local/lib/python3.12/site-packages/tenacity/__init__.py:475: in __call__
+    do = self.iter(retry_state=retry_state)
+/usr/local/lib/python3.12/site-packages/tenacity/__init__.py:376: in iter
+    result = action(retry_state)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+rs = <RetryCallState 139747895452800: attempt #3; slept for 10.0; last result: failed (ServerSelectionTimeoutError localhos...7: [Errno 111] Connection refused (configured timeouts: socketTimeoutMS: 20000.0ms, connectTimeoutMS: 20000.0ms)')>]>)>
+
+    def exc_check(rs: "RetryCallState") -> None:
+        fut = t.cast(Future, rs.outcome)
+        retry_exc = self.retry_error_cls(fut)
+        if self.reraise:
+            raise retry_exc.reraise()
+>       raise retry_exc from fut.exception()
+E       tenacity.RetryError: RetryError[<Future at 0x7f1997a67290 state=finished raised ServerSelectionTimeoutError>]
+
+/usr/local/lib/python3.12/site-packages/tenacity/__init__.py:419: RetryError
+------------------------------ Captured log call -------------------------------
+ERROR    client_alpha_data_generator:client_alpha_data_generator.py:494 Retrying MongoDB connection (attempt 1)
+ERROR    client_alpha_data_generator:client_alpha_data_generator.py:494 Retrying MongoDB connection (attempt 2)
+____________________ test_generate_random_record_with_null _____________________
+
+mocker = <pytest_mock.plugin.MockerFixture object at 0x7f1997a41d90>
+
+    def test_generate_random_record_with_null(mocker):
+        """Test generate_random_record handles NULL values."""
+        support_categories = ["category1"]
+        agent_pseudo_names = ["agent1"]
+        customer_types = ["type1"]
+        mocker.patch("random.random", return_value=0.05)  # Trigger NULL
+        mocker.patch("random.randint", side_effect=[300, 500, 400, 5])  # interaction_duration, CONTACT_DATE, TOTAL_TIME, RATING
+        # Correct sequence of random.choice calls
+        mocker.patch("random.choice", side_effect=[
+            "SUPPORT_CATEGORY",  # key_to_nullify
+            "agent1",  # AGENT_PSEUDO_NAME
+            "COMPLETED",  # INTERACTION_STATUS
+            "CALL",  # INTERACTION_TYPE
+            "type1",  # TYPE_OF_CUSTOMER
+            "RESOLVED",  # STATUS_OF_CUSTOMER_INCIDENT
+            "YES",  # RESOLVED_IN_FIRST_CONTACT
+            "SELF-HELP OPTION"  # SOLUTION_TYPE
+        ])
+>       record, has_null = generate_random_record(501, support_categories, agent_pseudo_names, customer_types)
+
+tests/support_insights_tests/test_client_alpha_data_generator.py:277: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/support_insights/client_alpha_data_generator.py:377: in generate_random_record
+    key_to_nullify = random.choice(
+/usr/local/lib/python3.12/unittest/mock.py:1139: in __call__
+    return self._mock_call(*args, **kwargs)
+/usr/local/lib/python3.12/unittest/mock.py:1143: in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <MagicMock name='choice' id='139747895029792'>
+args = (['SUPPORT_CATEGORY', 'AGENT_PSEUDO_NAME', 'CONTACT_DATE', 'INTERACTION_STATUS', 'INTERACTION_TYPE', 'TYPE_OF_CUSTOMER', ...],)
+kwargs = {}, effect = <list_iterator object at 0x7f1997a3aa40>
+
+    def _execute_mock_call(self, /, *args, **kwargs):
+        # separate from _increment_mock_call so that awaited functions are
+        # executed separately from their call, also AsyncMock overrides this method
+    
+        effect = self.side_effect
+        if effect is not None:
+            if _is_exception(effect):
+                raise effect
+            elif not _callable(effect):
+>               result = next(effect)
+E               StopIteration
+
+/usr/local/lib/python3.12/unittest/mock.py:1200: StopIteration
+_______________ test_generate_and_update_records_update_id_range _______________
+
+mock_mongo_client = (<MagicMock id='139747894991552'>, <MagicMock name='mock.__getitem__().__getitem__()' id='139747894944416'>)
+mock_sqlite_conn = (<MagicMock spec='Connection' id='139747894925536'>, <MagicMock name='mock.cursor()' spec='Cursor' id='139747894929760'>)
+mocker = <pytest_mock.plugin.MockerFixture object at 0x7f1997a385c0>
+
+    def test_generate_and_update_records_update_id_range(mock_mongo_client, mock_sqlite_conn, mocker):
+        """Test generate_and_update_records limits update_interaction_id to highest ID at chunk start."""
+        _, collection = mock_mongo_client
+        conn, cursor = mock_sqlite_conn
+        support_categories = ["category1"]
+        agent_pseudo_names = ["agent1"]
+        customer_types = ["type1"]
+        num_records = 150
+        chunk_size = 100
+        start_interaction_id = 500
+    
+        # Mock random to always trigger updates
+        update_random_calls = [0.1] * 30 + [0.9] * 120  # Enough to hit the 20% limit (30 updates for 150 records)
+        null_random_calls = [0.5] * (150 + 30)  # For NULL checks (150 inserts + 30 updates)
+        mocker.patch("random.random", side_effect=update_random_calls + null_random_calls)  # Total: 330 calls
+        # Mock random.randint for interaction_duration, TOTAL_TIME, CONTACT_DATE, and RATING
+        # Each record makes 4 calls: interaction_duration, CONTACT_DATE, TOTAL_TIME, RATING
+        randint_calls = [300, 500, 400, 5] * (150 + 30)  # For each record and update (180 records * 4 = 720 calls)
+        mocker.patch("random.randint", side_effect=randint_calls)
+    
+        # Mock random.randint specifically for update_interaction_id
+        update_id_calls = []
+        def mock_randint(a, b):
+            update_id_calls.append((a, b))
+            return b  # Always pick the upper bound to test the limit
+        mocker.patch("client_alpha_data_generator.random.randint", side_effect=mock_randint)
+    
+        inserts, updates, null_records, chunks = generate_and_update_records(
+            support_categories, agent_pseudo_names, customer_types,
+            start_serial_number=1000, start_interaction_id=start_interaction_id, num_records=num_records,
+            collection=collection, chunk_size=chunk_size, checkpoint_conn=conn, script_name="client_alpha_data_generator"
+        )
+    
+        # First chunk: 100 records, highest interaction ID = 500
+        # Second chunk: 50 records, highest interaction ID = 600
+        # Update IDs should be 500 for the first chunk and 600 for the second
+        expected_calls = [
+            (1, 500),  # First chunk updates
+            (1, 500),
+            (1, 600),  # Second chunk updates
+            (1, 600)
+        ]
+        assert inserts == 150
+>       assert updates == 30  # Max updates (20% of 150)
+E       assert 10 == 30
+
+tests/support_insights_tests/test_client_alpha_data_generator.py:324: AssertionError
+------------------------------ Captured log call -------------------------------
+INFO     client_alpha_data_generator:client_alpha_data_generator.py:434 Maximum allowed updates: 30 (20% of 150 records)
+INFO     client_alpha_data_generator:client_alpha_data_generator.py:448 Processing chunk 1/2: 100 records (records 1 to 100), highest interaction ID for updates: 500
+INFO     client_alpha_data_generator:client_alpha_data_generator.py:181 Saved checkpoint for script client_alpha_data_generator: max_serial_number=1110, max_record_id=600, records_processed=100
+INFO     client_alpha_data_generator:client_alpha_data_generator.py:448 Processing chunk 2/2: 50 records (records 101 to 150), highest interaction ID for updates: 600
+INFO     client_alpha_data_generator:client_alpha_data_generator.py:181 Saved checkpoint for script client_alpha_data_generator: max_serial_number=1160, max_record_id=650, records_processed=150
+INFO     client_alpha_data_generator:client_alpha_data_generator.py:483 Generated 150 records: 150 inserts, 10 updates, 0 with NULL values, 2 chunks processed
+________________ test_generate_and_update_records_update_limit _________________
+
+mock_mongo_client = (<MagicMock id='139747876900064'>, <MagicMock name='mock.__getitem__().__getitem__()' id='139747895027392'>)
+mock_sqlite_conn = (<MagicMock spec='Connection' id='139747895065728'>, <MagicMock name='mock.cursor()' spec='Cursor' id='139747921176832'>)
+mocker = <pytest_mock.plugin.MockerFixture object at 0x7f19968f95e0>
+
+    def test_generate_and_update_records_update_limit(mock_mongo_client, mock_sqlite_conn, mocker):
+        """Test generate_and_update_records limits updates to 20% of num_records."""
+        _, collection = mock_mongo_client
+        conn, cursor = mock_sqlite_conn
+        support_categories = ["category1"]
+        agent_pseudo_names = ["agent1"]
+        customer_types = ["type1"]
+        num_records = 100
+        chunk_size = 50
+        max_updates = int(num_records * MAX_UPDATE_PERCENTAGE)  # 20% of 100 = 20
+    
+        # Mock random to always trigger updates until the limit
+        update_random_calls = [0.1] * max_updates + [0.9] * (num_records - max_updates)  # Trigger updates for first 20, then stop
+        null_random_calls = [0.5] * (num_records + max_updates)  # For NULL checks (100 inserts + 20 updates)
+        mocker.patch("random.random", side_effect=update_random_calls + null_random_calls)  # Total: 220 calls
+        # Mock random.randint for interaction_duration, TOTAL_TIME, CONTACT_DATE, and RATING
+        randint_calls = [300, 500, 400, 5] * (num_records + max_updates)  # For each record and update (120 records * 4 = 480 calls)
+        mocker.patch("random.randint", side_effect=randint_calls)
+    
+        inserts, updates, null_records, chunks = generate_and_update_records(
+            support_categories, agent_pseudo_names, customer_types,
+            start_serial_number=1000, start_interaction_id=500, num_records=num_records,
+            collection=collection, chunk_size=chunk_size, checkpoint_conn=conn, script_name="client_alpha_data_generator"
+        )
+    
+        assert inserts == 100
+>       assert updates == max_updates  # Should be exactly 20
+E       assert 7 == 20
+
+tests/support_insights_tests/test_client_alpha_data_generator.py:358: AssertionError
+------------------------------ Captured log call -------------------------------
+INFO     client_alpha_data_generator:client_alpha_data_generator.py:434 Maximum allowed updates: 20 (20% of 100 records)
+INFO     client_alpha_data_generator:client_alpha_data_generator.py:448 Processing chunk 1/2: 50 records (records 1 to 50), highest interaction ID for updates: 500
+INFO     client_alpha_data_generator:client_alpha_data_generator.py:181 Saved checkpoint for script client_alpha_data_generator: max_serial_number=1057, max_record_id=550, records_processed=50
+INFO     client_alpha_data_generator:client_alpha_data_generator.py:448 Processing chunk 2/2: 50 records (records 51 to 100), highest interaction ID for updates: 550
+INFO     client_alpha_data_generator:client_alpha_data_generator.py:181 Saved checkpoint for script client_alpha_data_generator: max_serial_number=1107, max_record_id=600, records_processed=100
+INFO     client_alpha_data_generator:client_alpha_data_generator.py:483 Generated 100 records: 100 inserts, 7 updates, 0 with NULL values, 2 chunks processed
+_____________________________ test_main_full_flow ______________________________
+
+    def main() -> None:
+        """Main function to generate and load random client_alpha support records into MongoDB."""
+        start_time = datetime.now(timezone.utc)
+        # Use log file from environment variable set by orchestrator, with fallback
+        log_file_name = os.getenv("SCRIPT_LOG_FILE", f"/app/logs/client_alpha_data_generator_{start_time.strftime('%Y%m%d_%H%M%S')}.log")
+        setup_logging(log_file_name)
+        SCRIPT_LOGGER.info("Starting Client Alpha Data Generator")
+    
+        # Check dependencies
+        check_dependencies()
+    
+        # Check environment variables
+        check_env_vars()
+    
+        # Fetch configuration from environment variables
+        postgres_host = os.getenv("POSTGRES_HOST")
+        postgres_port = os.getenv("POSTGRES_PORT")
+        postgres_database_name = os.getenv("POSTGRES_DATABASE_NAME")
+        db_user = os.getenv("DB_USER")
+        db_password = os.getenv("DB_PASSWORD")
+        mongo_host = os.getenv("MONGO_HOST")
+        mongo_port = os.getenv("MONGO_PORT")
+        mongo_db = os.getenv("MONGO_DB")
+        mongo_user = os.getenv("MONGO_USER")
+        mongo_password = os.getenv("MONGO_PASSWORD")
+        mongo_collection_name = os.getenv("MINIO_CLIENT_ALPHA_STORAGE_BUCKET", "client_alpha_storage")
+        chunk_size = int(os.getenv("CHUNK_SIZE", DEFAULT_CHUNK_SIZE))
+    
+        # Validate environment variables
+        required_vars = {
+            "POSTGRES_HOST": postgres_host,
+            "POSTGRES_PORT": postgres_port,
+            "POSTGRES_DATABASE_NAME": postgres_database_name,
+            "DB_USER": db_user,
+            "DB_PASSWORD": db_password,
+            "MONGO_HOST": mongo_host,
+            "MONGO_PORT": mongo_port,
+            "MONGO_DB": mongo_db,
+            "MONGO_USER": mongo_user,
+            "MONGO_PASSWORD": mongo_password
+        }
+        missing_vars = [key for key, value in required_vars.items() if not value]
+        if missing_vars:
+            SCRIPT_LOGGER.error("Missing required environment variables: %s", ", ".join(missing_vars))
+            sys.exit(1)
+    
+        # Initialize SQLite for checkpointing
+        checkpoint_conn = None
+        try:
+            checkpoint_conn = init_sqlite_checkpoint_db(DB_FILE)
+        except Exception as e:
+            SCRIPT_LOGGER.error("Failed to initialize checkpoint database: %s", str(e), exc_info=True)
+            sys.exit(1)
+    
+        # Use script name as identifier for checkpointing
+        script_name = "client_alpha_data_generator"
+    
+        # Connect to MongoDB with retries
+        client = None
+        try:
+            client = connect_to_mongodb(
+                mongo_host=mongo_host,
+                mongo_port=int(mongo_port),
+                mongo_user=mongo_user,
+                mongo_password=mongo_password
+            )
+            collection = get_mongodb_collection(mongo_db, mongo_collection_name, client)
+        except Exception as e:
+            SCRIPT_LOGGER.error("Failed to connect to MongoDB: %s", str(e), exc_info=True)
+            sys.exit(1)
+    
+        # Connect to PostgreSQL and fetch allowed values
+        try:
+            engine = connect_to_database(
+                postgres_host=postgres_host,
+                postgres_port=postgres_port,
+                postgres_database_name=postgres_database_name,
+                db_user=db_user,
+                db_password=db_password,
+                logger=SCRIPT_LOGGER
+            )
+            support_categories = fetch_allowed_values(
+                logger=SCRIPT_LOGGER,
+                engine=engine,
+                table_name="DS.SUPPORT_AREAS",
+                source_name="'client_alpha'",
+                column_name="SUPPORT_AREA_NAME"
+            )
+            agent_pseudo_names = fetch_allowed_values(
+                logger=SCRIPT_LOGGER,
+                engine=engine,
+                table_name="DS.AGENTS",
+                source_name="'client_alpha'",
+                column_name="PSEUDO_CODE"
+            )
+            customer_types = fetch_allowed_values(
+                logger=SCRIPT_LOGGER,
+                engine=engine,
+                table_name="DS.CUSTOMER_TYPES",
+                source_name="'client_alpha'",
+                column_name="CUSTOMER_TYPE_NAME"
+            )
+            SCRIPT_LOGGER.info("Fetched allowed values - Support Categories: %d, Agent Pseudo Names: %d, Customer Types: %d",
+                               len(support_categories), len(agent_pseudo_names), len(customer_types))
+        except Exception as e:
+            SCRIPT_LOGGER.error("Failed to fetch allowed values from PostgreSQL: %s", str(e), exc_info=True)
+            sys.exit(1)
+        finally:
+            close_database_connection(SCRIPT_LOGGER, engine)
+    
+        # Fetch max values from MongoDB
+        try:
+            max_serial_number, max_interaction_id = get_max_values(collection)
+        except Exception as e:
+            SCRIPT_LOGGER.error("Failed to fetch max values from MongoDB: %s", str(e), exc_info=True)
+            sys.exit(1)
+    
+        # Check for checkpoint to resume
+        start_records_processed = 0
+        checkpoint = load_checkpoint(checkpoint_conn, script_name)
+        if checkpoint:
+            max_serial_number, max_interaction_id, start_records_processed = checkpoint
+            SCRIPT_LOGGER.info("Resuming from checkpoint: starting at max_serial_number %d, max_record_id %d, records_processed %d",
+                               max_serial_number, max_interaction_id, start_records_processed)
+    
+        # Parse and validate command-line arguments
+        parser = argparse.ArgumentParser(description="Generate and load records into MongoDB.")
+        parser.add_argument(
+            "input",
+            nargs="?",
+            default=None,
+            type=int,
+            help="Number of records to generate (default: random between 1 and 1000)"
+        )
+        args = parser.parse_args()
+        num_records = args.input if args.input is not None else random.randint(1, 1000)
+        if num_records <= 0:
+            SCRIPT_LOGGER.error("Number of records must be a positive integer, got %d", num_records)
+            sys.exit(1)
+        SCRIPT_LOGGER.info("Generating %d new records starting from max_serial_number %d and max_record_id %d (chunk size: %d)",
+                           num_records, max_serial_number + 1, max_interaction_id + 1, chunk_size)
+    
+        # Generate and load records
+        total_inserts = 0
+        total_updates = 0
+        total_null_records = 0
+        total_chunks_processed = 0
+        try:
+            inserts, updates, null_records, chunks_processed = generate_and_update_records(
+                support_categories=support_categories,
+                agent_pseudo_names=agent_pseudo_names,
+                customer_types=customer_types,
+                start_serial_number=max_serial_number,
+                start_interaction_id=max_interaction_id,
+                num_records=num_records,
+                collection=collection,
+                chunk_size=chunk_size,
+                checkpoint_conn=checkpoint_conn,
+                script_name=script_name,
+                start_records_processed=start_records_processed
+            )
+            total_inserts += inserts
+            total_updates += updates
+            total_null_records += null_records
+            total_chunks_processed += chunks_processed
+    
+            # Clear checkpoint on successful completion
+>           clear_checkpoint(checkpoint_conn, script_name)
+
+scripts/support_insights/client_alpha_data_generator.py:695: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/local/lib/python3.12/site-packages/tenacity/__init__.py:336: in wrapped_f
+    return copy(f, *args, **kw)
+/usr/local/lib/python3.12/site-packages/tenacity/__init__.py:475: in __call__
+    do = self.iter(retry_state=retry_state)
+/usr/local/lib/python3.12/site-packages/tenacity/__init__.py:376: in iter
+    result = action(retry_state)
+/usr/local/lib/python3.12/site-packages/tenacity/__init__.py:398: in <lambda>
+    self._add_action_func(lambda rs: rs.outcome.result())
+/usr/local/lib/python3.12/concurrent/futures/_base.py:449: in result
+    return self.__get_result()
+/usr/local/lib/python3.12/concurrent/futures/_base.py:401: in __get_result
+    raise self._exception
+/usr/local/lib/python3.12/site-packages/tenacity/__init__.py:478: in __call__
+    result = fn(*args, **kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+conn = <MagicMock spec='Connection' id='139747873060768'>
+script_name = 'client_alpha_data_generator'
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_fixed(5),
+        retry=retry_if_exception_type(sqlite3.OperationalError),
+        before_sleep=lambda retry_state: SCRIPT_LOGGER.error("Retrying SQLite clear operation (attempt %d): %s", retry_state.attempt_number, str(retry_state.outcome.exception()))
+    )
+    def clear_checkpoint(conn: sqlite3.Connection, script_name: str) -> None:
+        """Clear checkpoint data from SQLite after successful completion with retries.
+    
+        Args:
+            conn: SQLite connection.
+            script_name: Name of the script (e.g., 'client_alpha_data_generator').
+    
+        Raises:
+            sqlite3.Error: If database operation fails after retries.
+        """
+        try:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM checkpoints WHERE script_name = ?", (script_name,))
+            conn.commit()
+            # Verify the row was deleted
+            cursor.execute("SELECT COUNT(*) FROM checkpoints WHERE script_name = ?", (script_name,))
+>           count = cursor.fetchone()[0]
+E           TypeError: 'NoneType' object is not subscriptable
+
+scripts/support_insights/client_alpha_data_generator.py:246: TypeError
+
+During handling of the above exception, another exception occurred:
+
+mock_mongo_client = (<MagicMock id='139747876060240'>, <MagicMock name='mock.__getitem__().__getitem__()' id='139747911068960'>)
+mock_sqlite_conn = (<MagicMock spec='Connection' id='139747873060768'>, <MagicMock name='mock.cursor()' spec='Cursor' id='139747873062880'>)
+mocker = <pytest_mock.plugin.MockerFixture object at 0x7f199682bdd0>
+env_vars = None
+log_capture = ['2025-05-21 14:32:09,533 - client_alpha_data_generator - INFO - Starting Client Alpha Data Generator\n', '2025-05-21 ... INFO - Generating 150 new records starting from max_serial_number 1001 and max_record_id 501 (chunk size: 50)\n', ...]
+
+    def test_main_full_flow(mock_mongo_client, mock_sqlite_conn, mocker, env_vars, log_capture):
+        """Test main function full flow."""
+        client, collection = mock_mongo_client
+        conn, cursor = mock_sqlite_conn
+        cursor.fetchone.side_effect = [None, (0,)]  # For load_checkpoint and clear_checkpoint
+        mocker.patch("client_alpha_data_generator.connect_to_mongodb", return_value=client)
+        mocker.patch("client_alpha_data_generator.init_sqlite_checkpoint_db", return_value=conn)
+        mocker.patch("client_alpha_data_generator.connect_to_database")
+        mocker.patch("client_alpha_data_generator.fetch_allowed_values", side_effect=[["cat1"], ["agent1"], ["type1"]])
+        mocker.patch("client_alpha_data_generator.close_database_connection")
+        mocker.patch("client_alpha_data_generator.get_max_values", return_value=(1000, 500))
+        mocker.patch("client_alpha_data_generator.load_checkpoint", return_value=None)
+        # Mock random.randint for num_records, interaction_duration, TOTAL_TIME, CONTACT_DATE, and RATING
+        randint_calls = [150] + [300, 500, 400, 5] * 150  # num_records + (150 records * 4)
+        mocker.patch("random.randint", side_effect=randint_calls)
+        mocker.patch("random.random", return_value=0.5)  # Avoid updates/NULL
+        # Mock sys.argv to provide a valid input
+        with patch("sys.argv", ["script.py", "150"]):
+>           main()
+
+tests/support_insights_tests/test_client_alpha_data_generator.py:382: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def main() -> None:
+        """Main function to generate and load random client_alpha support records into MongoDB."""
+        start_time = datetime.now(timezone.utc)
+        # Use log file from environment variable set by orchestrator, with fallback
+        log_file_name = os.getenv("SCRIPT_LOG_FILE", f"/app/logs/client_alpha_data_generator_{start_time.strftime('%Y%m%d_%H%M%S')}.log")
+        setup_logging(log_file_name)
+        SCRIPT_LOGGER.info("Starting Client Alpha Data Generator")
+    
+        # Check dependencies
+        check_dependencies()
+    
+        # Check environment variables
+        check_env_vars()
+    
+        # Fetch configuration from environment variables
+        postgres_host = os.getenv("POSTGRES_HOST")
+        postgres_port = os.getenv("POSTGRES_PORT")
+        postgres_database_name = os.getenv("POSTGRES_DATABASE_NAME")
+        db_user = os.getenv("DB_USER")
+        db_password = os.getenv("DB_PASSWORD")
+        mongo_host = os.getenv("MONGO_HOST")
+        mongo_port = os.getenv("MONGO_PORT")
+        mongo_db = os.getenv("MONGO_DB")
+        mongo_user = os.getenv("MONGO_USER")
+        mongo_password = os.getenv("MONGO_PASSWORD")
+        mongo_collection_name = os.getenv("MINIO_CLIENT_ALPHA_STORAGE_BUCKET", "client_alpha_storage")
+        chunk_size = int(os.getenv("CHUNK_SIZE", DEFAULT_CHUNK_SIZE))
+    
+        # Validate environment variables
+        required_vars = {
+            "POSTGRES_HOST": postgres_host,
+            "POSTGRES_PORT": postgres_port,
+            "POSTGRES_DATABASE_NAME": postgres_database_name,
+            "DB_USER": db_user,
+            "DB_PASSWORD": db_password,
+            "MONGO_HOST": mongo_host,
+            "MONGO_PORT": mongo_port,
+            "MONGO_DB": mongo_db,
+            "MONGO_USER": mongo_user,
+            "MONGO_PASSWORD": mongo_password
+        }
+        missing_vars = [key for key, value in required_vars.items() if not value]
+        if missing_vars:
+            SCRIPT_LOGGER.error("Missing required environment variables: %s", ", ".join(missing_vars))
+            sys.exit(1)
+    
+        # Initialize SQLite for checkpointing
+        checkpoint_conn = None
+        try:
+            checkpoint_conn = init_sqlite_checkpoint_db(DB_FILE)
+        except Exception as e:
+            SCRIPT_LOGGER.error("Failed to initialize checkpoint database: %s", str(e), exc_info=True)
+            sys.exit(1)
+    
+        # Use script name as identifier for checkpointing
+        script_name = "client_alpha_data_generator"
+    
+        # Connect to MongoDB with retries
+        client = None
+        try:
+            client = connect_to_mongodb(
+                mongo_host=mongo_host,
+                mongo_port=int(mongo_port),
+                mongo_user=mongo_user,
+                mongo_password=mongo_password
+            )
+            collection = get_mongodb_collection(mongo_db, mongo_collection_name, client)
+        except Exception as e:
+            SCRIPT_LOGGER.error("Failed to connect to MongoDB: %s", str(e), exc_info=True)
+            sys.exit(1)
+    
+        # Connect to PostgreSQL and fetch allowed values
+        try:
+            engine = connect_to_database(
+                postgres_host=postgres_host,
+                postgres_port=postgres_port,
+                postgres_database_name=postgres_database_name,
+                db_user=db_user,
+                db_password=db_password,
+                logger=SCRIPT_LOGGER
+            )
+            support_categories = fetch_allowed_values(
+                logger=SCRIPT_LOGGER,
+                engine=engine,
+                table_name="DS.SUPPORT_AREAS",
+                source_name="'client_alpha'",
+                column_name="SUPPORT_AREA_NAME"
+            )
+            agent_pseudo_names = fetch_allowed_values(
+                logger=SCRIPT_LOGGER,
+                engine=engine,
+                table_name="DS.AGENTS",
+                source_name="'client_alpha'",
+                column_name="PSEUDO_CODE"
+            )
+            customer_types = fetch_allowed_values(
+                logger=SCRIPT_LOGGER,
+                engine=engine,
+                table_name="DS.CUSTOMER_TYPES",
+                source_name="'client_alpha'",
+                column_name="CUSTOMER_TYPE_NAME"
+            )
+            SCRIPT_LOGGER.info("Fetched allowed values - Support Categories: %d, Agent Pseudo Names: %d, Customer Types: %d",
+                               len(support_categories), len(agent_pseudo_names), len(customer_types))
+        except Exception as e:
+            SCRIPT_LOGGER.error("Failed to fetch allowed values from PostgreSQL: %s", str(e), exc_info=True)
+            sys.exit(1)
+        finally:
+            close_database_connection(SCRIPT_LOGGER, engine)
+    
+        # Fetch max values from MongoDB
+        try:
+            max_serial_number, max_interaction_id = get_max_values(collection)
+        except Exception as e:
+            SCRIPT_LOGGER.error("Failed to fetch max values from MongoDB: %s", str(e), exc_info=True)
+            sys.exit(1)
+    
+        # Check for checkpoint to resume
+        start_records_processed = 0
+        checkpoint = load_checkpoint(checkpoint_conn, script_name)
+        if checkpoint:
+            max_serial_number, max_interaction_id, start_records_processed = checkpoint
+            SCRIPT_LOGGER.info("Resuming from checkpoint: starting at max_serial_number %d, max_record_id %d, records_processed %d",
+                               max_serial_number, max_interaction_id, start_records_processed)
+    
+        # Parse and validate command-line arguments
+        parser = argparse.ArgumentParser(description="Generate and load records into MongoDB.")
+        parser.add_argument(
+            "input",
+            nargs="?",
+            default=None,
+            type=int,
+            help="Number of records to generate (default: random between 1 and 1000)"
+        )
+        args = parser.parse_args()
+        num_records = args.input if args.input is not None else random.randint(1, 1000)
+        if num_records <= 0:
+            SCRIPT_LOGGER.error("Number of records must be a positive integer, got %d", num_records)
+            sys.exit(1)
+        SCRIPT_LOGGER.info("Generating %d new records starting from max_serial_number %d and max_record_id %d (chunk size: %d)",
+                           num_records, max_serial_number + 1, max_interaction_id + 1, chunk_size)
+    
+        # Generate and load records
+        total_inserts = 0
+        total_updates = 0
+        total_null_records = 0
+        total_chunks_processed = 0
+        try:
+            inserts, updates, null_records, chunks_processed = generate_and_update_records(
+                support_categories=support_categories,
+                agent_pseudo_names=agent_pseudo_names,
+                customer_types=customer_types,
+                start_serial_number=max_serial_number,
+                start_interaction_id=max_interaction_id,
+                num_records=num_records,
+                collection=collection,
+                chunk_size=chunk_size,
+                checkpoint_conn=checkpoint_conn,
+                script_name=script_name,
+                start_records_processed=start_records_processed
+            )
+            total_inserts += inserts
+            total_updates += updates
+            total_null_records += null_records
+            total_chunks_processed += chunks_processed
+    
+            # Clear checkpoint on successful completion
+            clear_checkpoint(checkpoint_conn, script_name)
+        except Exception as e:
+            SCRIPT_LOGGER.error("Failed to generate or load records: %s", str(e), exc_info=True)
+>           sys.exit(1)
+E           SystemExit: 1
+
+scripts/support_insights/client_alpha_data_generator.py:698: SystemExit
+------------------------------ Captured log call -------------------------------
+INFO     client_alpha_data_generator:client_alpha_data_generator.py:534 Starting Client Alpha Data Generator
+INFO     client_alpha_data_generator:client_alpha_data_generator.py:86 Required dependencies from allowed_values: sqlalchemy==2.0.35, psycopg2==2.9.10, tenacity==8.5.0
+INFO     client_alpha_data_generator:client_alpha_data_generator.py:94 All expected environment variables are present
+INFO     client_alpha_data_generator:client_alpha_data_generator.py:270 Accessing MongoDB collection: client_alpha_storage in database: test_mongo_db
+INFO     client_alpha_data_generator:client_alpha_data_generator.py:630 Fetched allowed values - Support Categories: 1, Agent Pseudo Names: 1, Customer Types: 1
+INFO     client_alpha_data_generator:client_alpha_data_generator.py:667 Generating 150 new records starting from max_serial_number 1001 and max_record_id 501 (chunk size: 50)
+INFO     client_alpha_data_generator:client_alpha_data_generator.py:434 Maximum allowed updates: 30 (20% of 150 records)
+INFO     client_alpha_data_generator:client_alpha_data_generator.py:448 Processing chunk 1/3: 50 records (records 1 to 50), highest interaction ID for updates: 500
+INFO     client_alpha_data_generator:client_alpha_data_generator.py:181 Saved checkpoint for script client_alpha_data_generator: max_serial_number=1050, max_record_id=550, records_processed=50
+INFO     client_alpha_data_generator:client_alpha_data_generator.py:448 Processing chunk 2/3: 50 records (records 51 to 100), highest interaction ID for updates: 550
+INFO     client_alpha_data_generator:client_alpha_data_generator.py:181 Saved checkpoint for script client_alpha_data_generator: max_serial_number=1100, max_record_id=600, records_processed=100
+INFO     client_alpha_data_generator:client_alpha_data_generator.py:448 Processing chunk 3/3: 50 records (records 101 to 150), highest interaction ID for updates: 600
+INFO     client_alpha_data_generator:client_alpha_data_generator.py:181 Saved checkpoint for script client_alpha_data_generator: max_serial_number=1150, max_record_id=650, records_processed=150
+INFO     client_alpha_data_generator:client_alpha_data_generator.py:483 Generated 150 records: 150 inserts, 0 updates, 0 with NULL values, 3 chunks processed
+ERROR    client_alpha_data_generator:client_alpha_data_generator.py:697 Failed to generate or load records: 'NoneType' object is not subscriptable
+Traceback (most recent call last):
+  File "/app/scripts/support_insights/client_alpha_data_generator.py", line 695, in main
+    clear_checkpoint(checkpoint_conn, script_name)
+  File "/usr/local/lib/python3.12/site-packages/tenacity/__init__.py", line 336, in wrapped_f
+    return copy(f, *args, **kw)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/tenacity/__init__.py", line 475, in __call__
+    do = self.iter(retry_state=retry_state)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/tenacity/__init__.py", line 376, in iter
+    result = action(retry_state)
+             ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/tenacity/__init__.py", line 398, in <lambda>
+    self._add_action_func(lambda rs: rs.outcome.result())
+                                     ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/concurrent/futures/_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/usr/local/lib/python3.12/site-packages/tenacity/__init__.py", line 478, in __call__
+    result = fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^
+  File "/app/scripts/support_insights/client_alpha_data_generator.py", line 246, in clear_checkpoint
+    count = cursor.fetchone()[0]
+            ~~~~~~~~~~~~~~~~~^^^
+TypeError: 'NoneType' object is not subscriptable
+=========================== short test summary info ============================
+FAILED tests/support_insights_tests/test_client_alpha_data_generator.py::test_connect_to_mongodb_success
+FAILED tests/support_insights_tests/test_client_alpha_data_generator.py::test_connect_to_mongodb_retry_failure
+FAILED tests/support_insights_tests/test_client_alpha_data_generator.py::test_generate_random_record_with_null
+FAILED tests/support_insights_tests/test_client_alpha_data_generator.py::test_generate_and_update_records_update_id_range
+FAILED tests/support_insights_tests/test_client_alpha_data_generator.py::test_generate_and_update_records_update_limit
+FAILED tests/support_insights_tests/test_client_alpha_data_generator.py::test_main_full_flow
+=================== 6 failed, 15 passed in 201.06s (0:03:21) ===================

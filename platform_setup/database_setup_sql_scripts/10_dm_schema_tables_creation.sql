@@ -49,9 +49,7 @@ CREATE TABLE IF NOT EXISTS dm.customer_support_fact (
                            ON UPDATE CASCADE
                            ,
     CONSTRAINT chk_customer_support_fact_end_date
-    CHECK                  (end_date >= start_date) ,
-    CONSTRAINT chk_customer_support_fact_rating
-    CHECK                  (customer_rating BETWEEN 1 AND 5)
+    CHECK                  (end_date >= start_date) 
 ) PARTITION BY LIST (source_id);
 
 -- Create partitions for specific source_id values
