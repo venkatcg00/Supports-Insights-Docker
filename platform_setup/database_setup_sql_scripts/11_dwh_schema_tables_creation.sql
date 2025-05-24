@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS dwh.ds_support_areas (
 
 CREATE TABLE IF NOT EXISTS dwh.ds_agents (
     dwh_agent_id          SERIAL       PRIMARY KEY,
-    agent_id              INT          NOT NULL UNIQUE, -- Fixed duplicate PRIMARY KEY
+    agent_id              INT          NOT NULL,
     first_name            TEXT         NOT NULL,
     middle_name           TEXT,
     last_name             TEXT         NOT NULL,
@@ -192,7 +192,7 @@ CREATE TABLE IF NOT EXISTS dwh.info_data_dictionary (
 CREATE TABLE IF NOT EXISTS dwh.aud_dag_runs (
     dwh_dag_run_id        SERIAL       PRIMARY KEY,
     dag_run_id            INT          NOT NULL,
-    airflow_dag_run_id    TEXT         NOT NULL UNIQUE,
+    airflow_dag_run_id    TEXT         NOT NULL,
     source_id             INT          NOT NULL,
     dag_run_status        TEXT         NOT NULL,
     run_start_date        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,

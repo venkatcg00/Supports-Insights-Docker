@@ -35,9 +35,7 @@ CREATE TABLE IF NOT EXISTS prs.client_alpha_cs_data (
                            ON UPDATE CASCADE
                            ,
     CONSTRAINT chk_client_alpha_end_date
-    CHECK                  (end_date >= start_date) ,
-    CONSTRAINT chk_client_alpha_rating
-    CHECK                  (rating BETWEEN 1 AND 10) -- Per client_alpha rating range
+    CHECK                  (end_date >= start_date) 
 );
 
 CREATE TABLE IF NOT EXISTS prs.client_beta_cs_data (
@@ -57,7 +55,7 @@ CREATE TABLE IF NOT EXISTS prs.client_beta_cs_data (
     incident_status        TEXT,
     first_contact_solve    BOOLEAN,
     type_of_resolution     TEXT,
-    support_rating         INTEGER, -- Fixed to INTEGER
+    support_rating         INTEGER,
     time_stamp             TIMESTAMP,
     hash_key               TEXT         NOT NULL,
     is_active              BOOLEAN      NOT NULL DEFAULT TRUE,
@@ -74,9 +72,7 @@ CREATE TABLE IF NOT EXISTS prs.client_beta_cs_data (
                            ON UPDATE CASCADE
                            ,
     CONSTRAINT chk_client_beta_end_date
-    CHECK                  (end_date >= start_date) ,
-    CONSTRAINT chk_client_beta_rating
-    CHECK                  (support_rating BETWEEN 1 AND 5) -- Per client_beta rating range
+    CHECK                  (end_date >= start_date)
 );
 
 CREATE TABLE IF NOT EXISTS prs.client_gamma_cs_data (
@@ -94,9 +90,9 @@ CREATE TABLE IF NOT EXISTS prs.client_gamma_cs_data (
     duration               INT,
     work_time              INT,
     ticket_status          TEXT,
-    resolved_in_first_contact BOOLEAN, -- Fixed to BOOLEAN
+    resolved_in_first_contact BOOLEAN,
     resolution_category    TEXT,
-    rating                 INTEGER, -- Fixed to INTEGER
+    rating                 TEXT,
     hash_key               TEXT         NOT NULL,
     is_active              BOOLEAN      NOT NULL DEFAULT TRUE,
     start_date             TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -112,9 +108,7 @@ CREATE TABLE IF NOT EXISTS prs.client_gamma_cs_data (
                            ON UPDATE CASCADE
                            ,
     CONSTRAINT chk_client_gamma_end_date
-    CHECK                  (end_date >= start_date) ,
-    CONSTRAINT chk_client_gamma_rating
-    CHECK                  (rating BETWEEN 1 AND 5) -- Per AT&T rating range
+    CHECK                  (end_date >= start_date)
 );
 
 -- Indexes for prs.client_alpha_cs_data
