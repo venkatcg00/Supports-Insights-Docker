@@ -6,18 +6,12 @@ CREATE TABLE IF NOT EXISTS dwh.ds_sources (
     source_id             INT          NOT NULL,
     source_name           TEXT         NOT NULL,
     source_file_type      TEXT         NOT NULL,
-    dataload_strategy     TEXT         NOT NULL,
-    last_loaded_record_id INT,
+    data_nature           TEXT         NOT NULL,
     description           TEXT,
     is_active             BOOLEAN      NOT NULL DEFAULT TRUE,
     start_date            TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     end_date              TIMESTAMP    NOT NULL DEFAULT '9999-12-31 23:59:59',
     dml_operation         TEXT         NOT NULL,
-    CONSTRAINT fk_ds_sources_source_id
-    FOREIGN KEY           (source_id) REFERENCES ds.sources(source_id)
-                          ON DELETE RESTRICT
-                          ON UPDATE CASCADE
-                          ,
     CONSTRAINT chk_ds_sources_end_date
     CHECK                 (end_date >= start_date) 
 );
@@ -32,16 +26,6 @@ CREATE TABLE IF NOT EXISTS dwh.ds_customer_types (
     start_date            TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     end_date              TIMESTAMP    NOT NULL DEFAULT '9999-12-31 23:59:59',
     dml_operation         TEXT         NOT NULL,
-    CONSTRAINT fk_ds_customer_types_customer_type_id
-    FOREIGN KEY           (customer_type_id) REFERENCES ds.customer_types(customer_type_id)
-                          ON DELETE RESTRICT
-                          ON UPDATE CASCADE
-                          ,
-    CONSTRAINT fk_ds_customer_types_source_id
-    FOREIGN KEY           (source_id) REFERENCES ds.sources(source_id)
-                          ON DELETE RESTRICT
-                          ON UPDATE CASCADE
-                          ,
     CONSTRAINT chk_ds_customer_types_end_date
     CHECK                 (end_date >= start_date) 
 );
@@ -56,16 +40,6 @@ CREATE TABLE IF NOT EXISTS dwh.ds_support_areas (
     start_date            TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     end_date              TIMESTAMP    NOT NULL DEFAULT '9999-12-31 23:59:59',
     dml_operation         TEXT         NOT NULL,
-    CONSTRAINT fk_ds_support_areas_support_area_id
-    FOREIGN KEY           (support_area_id) REFERENCES ds.support_areas(support_area_id)
-                          ON DELETE RESTRICT
-                          ON UPDATE CASCADE
-                          ,
-    CONSTRAINT fk_ds_support_areas_source_id
-    FOREIGN KEY           (source_id) REFERENCES ds.sources(source_id)
-                          ON DELETE RESTRICT
-                          ON UPDATE CASCADE
-                          ,
     CONSTRAINT chk_ds_support_areas_end_date
     CHECK                 (end_date >= start_date) 
 );
@@ -82,16 +56,6 @@ CREATE TABLE IF NOT EXISTS dwh.ds_agents (
     start_date            TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     end_date              TIMESTAMP    NOT NULL DEFAULT '9999-12-31 23:59:59',
     dml_operation         TEXT         NOT NULL,
-    CONSTRAINT fk_ds_agents_agent_id
-    FOREIGN KEY           (agent_id) REFERENCES ds.agents(agent_id)
-                          ON DELETE RESTRICT
-                          ON UPDATE CASCADE
-                          ,
-    CONSTRAINT fk_ds_agents_source_id
-    FOREIGN KEY           (source_id) REFERENCES ds.sources(source_id)
-                          ON DELETE RESTRICT
-                          ON UPDATE CASCADE
-                          ,
     CONSTRAINT chk_ds_agents_end_date
     CHECK                 (end_date >= start_date) 
 );
@@ -105,11 +69,6 @@ CREATE TABLE IF NOT EXISTS dwh.info_object_types (
     start_date            TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     end_date              TIMESTAMP    NOT NULL DEFAULT '9999-12-31 23:59:59',
     dml_operation         TEXT         NOT NULL,
-    CONSTRAINT fk_info_object_types_object_type_id
-    FOREIGN KEY           (object_type_id) REFERENCES info.object_types(object_type_id)
-                          ON DELETE RESTRICT
-                          ON UPDATE CASCADE
-                          ,
     CONSTRAINT chk_info_object_types_end_date
     CHECK                 (end_date >= start_date) 
 );
@@ -125,21 +84,6 @@ CREATE TABLE IF NOT EXISTS dwh.info_object_names (
     start_date            TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     end_date              TIMESTAMP    NOT NULL DEFAULT '9999-12-31 23:59:59',
     dml_operation         TEXT         NOT NULL,
-    CONSTRAINT fk_info_object_names_object_name_id
-    FOREIGN KEY           (object_name_id) REFERENCES info.object_names(object_name_id)
-                          ON DELETE RESTRICT
-                          ON UPDATE CASCADE
-                          ,
-    CONSTRAINT fk_info_object_names_object_type_id
-    FOREIGN KEY           (object_type_id) REFERENCES info.object_types(object_type_id)
-                          ON DELETE RESTRICT
-                          ON UPDATE CASCADE
-                          ,
-    CONSTRAINT fk_info_object_names_object_load_strategy_id
-    FOREIGN KEY           (object_load_strategy_id) REFERENCES info.object_load_strategies(object_load_strategy_id)
-                          ON DELETE RESTRICT
-                          ON UPDATE CASCADE
-                          ,
     CONSTRAINT chk_info_object_names_end_date
     CHECK                 (end_date >= start_date) 
 );
@@ -153,11 +97,6 @@ CREATE TABLE IF NOT EXISTS dwh.info_object_load_strategies (
     start_date            TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     end_date              TIMESTAMP    NOT NULL DEFAULT '9999-12-31 23:59:59',
     dml_operation         TEXT         NOT NULL,
-    CONSTRAINT fk_info_object_load_strategies_object_load_strategy_id
-    FOREIGN KEY           (object_load_strategy_id) REFERENCES info.object_load_strategies(object_load_strategy_id)
-                          ON DELETE RESTRICT
-                          ON UPDATE CASCADE
-                          ,
     CONSTRAINT chk_info_object_load_strategies_end_date
     CHECK                 (end_date >= start_date) 
 );
@@ -175,16 +114,6 @@ CREATE TABLE IF NOT EXISTS dwh.info_data_dictionary (
     start_date            TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     end_date              TIMESTAMP    NOT NULL DEFAULT '9999-12-31 23:59:59',
     dml_operation         TEXT         NOT NULL,
-    CONSTRAINT fk_info_data_dictionary_data_dictionary_id
-    FOREIGN KEY           (data_dictionary_id) REFERENCES info.data_dictionary(data_dictionary_id)
-                          ON DELETE RESTRICT
-                          ON UPDATE CASCADE
-                          ,
-    CONSTRAINT fk_info_data_dictionary_source_id
-    FOREIGN KEY           (source_id) REFERENCES ds.sources(source_id)
-                          ON DELETE RESTRICT
-                          ON UPDATE CASCADE
-                          ,
     CONSTRAINT chk_info_data_dictionary_end_date
     CHECK                 (end_date >= start_date) 
 );
@@ -204,18 +133,9 @@ CREATE TABLE IF NOT EXISTS dwh.aud_dag_runs (
     valid_count           INT,
     validity_percentage   DECIMAL(5,2),
     run_duration          INTERVAL,
+    source_checkpoint     INT,
     dml_operation         TEXT         NOT NULL,
     is_active             BOOLEAN      NOT NULL DEFAULT TRUE,
-    CONSTRAINT fk_aud_dag_runs_dag_run_id
-    FOREIGN KEY           (dag_run_id) REFERENCES aud.dag_runs(dag_run_id)
-                          ON DELETE RESTRICT
-                          ON UPDATE CASCADE
-                          ,
-    CONSTRAINT fk_aud_dag_runs_source_id
-    FOREIGN KEY           (source_id) REFERENCES ds.sources(source_id)
-                          ON DELETE RESTRICT
-                          ON UPDATE CASCADE
-                          ,
     CONSTRAINT chk_aud_dag_runs_end_date
     CHECK                 (run_end_date >= run_start_date) 
 );

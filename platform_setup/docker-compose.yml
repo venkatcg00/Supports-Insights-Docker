@@ -131,12 +131,10 @@ services:
     volumes:
       - orchestration_ui_data:/app
       - ../support_insights/data_generators:/app/scripts/support_insights
-      - ../support_insights/data_generator_tests:/app/tests/support_insights_tests
       - ../clickstream_telemetry/data_generators:/app/scripts/clickstream_telemetry
-      - ../clickstream_telemetry/data_generator_tests:/app/tests/clickstream_telemetry
-      - ./python_scripts_orchestrator:/app/scripts/python_scripts_orchestrator
-      - ./entrypoint_scripts/orchestration_ui_startup.sh:/app/orchestration_ui_startup.sh
-      - ./entrypoint_scripts/sqlite3_db_setup.sql:/app/sqlite3_db_setup.sql
+      - ./entrypoint_files/data_generator_orchestrator.py:/app/scripts/python_scripts_orchestrator/data_generator_orchestrator.py
+      - ./entrypoint_files/orchestration_ui_startup.sh:/app/orchestration_ui_startup.sh
+      - ./entrypoint_files/sqlite3_db_setup.sql:/app/sqlite3_db_setup.sql
     ports:
       - "1212:1212"
     command: bash /app/orchestration_ui_startup.sh
@@ -159,17 +157,21 @@ services:
       SPARK_MODE: master
       SPARK_WORKER_INSTANCES: 1
       SPARK_WORKER_MEMORY: 1G
-      PYSPARK_PYTHON: /opt/bitnami/python/bin/python3
-      PYSPARK_DRIVER_PYTHON: /opt/bitnami/python/bin/python3
       SPARK_RPC_AUTHENTICATION_ENABLED: "false"
       SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED: "false"
       SPARK_SSL_ENABLED: "false"
+      PYSPARK_PYTHON: /usr/bin/python3.11
+      PYSPARK_DRIVER_PYTHON: /usr/bin/python3.11
+      SPARK_CONF_DIR: /opt/spark/conf
     ports:
       - "7077:7077"
       - "1234:8080"
-      - "4040-4050:4040-4050"
     volumes:
-      - ./jars/postgresql-jdbc.jar:/opt/bitnami/spark/jars/postgresql-jdbc.jar:ro
+      - ./entrypoint_files/postgresql-jdbc.jar:/opt/spark/jars/postgresql-jdbc.jar
+      - ./entrypoint_files/spark_startup.sh:/spark_startup.sh
+      - ./entrypoint_files/log4j2.properties:/opt/spark/conf/log4j2.properties
+    command: >
+      /bin/bash /spark_startup.sh
     networks:
       - data-network
     healthcheck:
@@ -178,8 +180,7 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
-    mem_limit: 2g
-    command: /opt/bitnami/spark/sbin/start-master.sh
+    mem_limit: 6g
 
   airflow:
     build:
@@ -193,11 +194,9 @@ services:
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      AIRFLOW_LOAD_EXAMPLES: "no"
-      PYTHONPATH: /opt/airflow
+      AIRFLOW_LOAD_EXAMPLES: "False"
       AIRFLOW__LOGGING__BASE_LOG_FOLDER: /opt/airflow/logs
       AIRFLOW__LOGGING__LOGGING_LEVEL: INFO
-      AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
       AIRFLOW_WEBSERVER_SECRET_KEY: "${AIRFLOW_WEBSERVER_SECRET_KEY}"
       AIRFLOW_APISERVER_SECRET_KEY: "${AIRFLOW_APISERVER_SECRET_KEY}"
       AIRFLOW_FERNET_KEY: "${AIRFLOW_FERNET_KEY}"
@@ -213,12 +212,28 @@ services:
       AIRFLOW_DATABASE_PORT_NUMBER: "${POSTGRES_PORT}"
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_DEFAULT_USER}:${PROJECT_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${AIRFLOW_METADATA_DATABASE}
       AIRFLOW__DATABASE__CONN_MAX_AGE: 30
+      AIRFLOW__CORE__PARALLELISM: 12
+      AIRFLOW__CORE__DAG_CONCURRENCY: 10
+      AIRFLOW__CORE__MAX_ACTIVE_RUNS_PER_DAG: 1
+      AIRFLOW__CORE__MAX_ACTIVE_RUNS: 10
+      _AIRFLOW_DB_MIGRATE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: ${PROJECT_USER}
+      _AIRFLOW_WWW_USER_PASSWORD: ${PROJECT_PASSWORD}
+      AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.session
+      AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
     volumes:
       - ../support_insights/data_loaders:/opt/airflow/dags/support_insights
-      - ../clickstream_telemetry/data_loaders:/opt/airflow/dags/clickstream_telemetry
+      - ../clickstream_telemetry/data_loaders/airflow_dags:/opt/airflow/dags/clickstream_telemetry
+      - ./entrypoint_files/postgresql-jdbc.jar:/opt/spark/jars/postgresql-jdbc.jar
       - airflow_logs:/opt/airflow/logs
     ports:
       - "8080:8080"
+    command: bash -c "
+      airflow scheduler --daemon & \
+      airflow triggerer --daemon & \
+      airflow dag-processor & \
+      airflow api-server"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/"]
       interval: 5s
@@ -227,7 +242,6 @@ services:
       start_period: 60s
     networks:
       - data-network
-    mem_limit: 1.5g
 
   trino:
     image: trinodb/trino:475
@@ -248,6 +262,7 @@ services:
       HIVE_METASTORE_DATABASE: "${HIVE_METASTORE_DATABASE}"
       MINIO_HOST: "${MINIO_HOST}"
       MINIO_PORT: "${MINIO_PORT}"
+      MINIO_CLICKSTREAM_TELEMETRY_BUCKET: "${MINIO_CLICKSTREAM_TELEMETRY_BUCKET}"
       PROJECT_USER: "${PROJECT_USER}"
       PROJECT_PASSWORD: "${PROJECT_PASSWORD}"
       ICEBERG_FILE_FORMAT: "${ICEBERG_FILE_FORMAT}"
@@ -256,10 +271,7 @@ services:
       TRINO_ENVIRONMENT: "${TRINO_ENVIRONMENT}"
       TRINO_DATA_DIR: "${TRINO_DATA_DIR}"
     volumes:
-    - ./trino/etc:/etc/trino:ro
-    - ./trino/etc:/usr/lib/trino/etc/:ro
-    - ./jars/postgresql-jdbc.jar:/usr/lib/trino/plugin/iceberg/postgresql-jdbc.jar:ro
-    - ./entrypoint_scripts/trino_startup.sh:/trino_startup.sh:ro
+    - ./entrypoint_files/trino_startup.sh:/trino_startup.sh
     command: >
       /bin/bash /trino_startup.sh
     networks:
@@ -289,7 +301,6 @@ services:
       - SUPERSET_DATABASE_HOST=${POSTGRES_HOST}
       - SUPERSET_DATABASE_PORT_NUMBER=${POSTGRES_PORT}
       - SUPERSET_DATABASE_NAME=${SUPERSET_METADATA_DATABASE}
-      - SUPERSET_CONFIG_PATH=/opt/bitnami/superset/superset_config.py
       - FIRST_NAME=${FIRST_NAME}
       - LAST_NAME=${LAST_NAME}
       - EMAIL_ADDRESS=${EMAIL_ADDRESS}
@@ -304,7 +315,7 @@ services:
     volumes:
       - ../clickstream_telemetry/data_dashboards:/app/bitnami/superset_home/clickstream_telemetry/dashboards
       - ../support_insights/data_dashboards:/app/bitnami/superset_home/support_insights/dashboards
-      - ./entrypoint_scripts/superset_startup.sh:/app/superset_startup.sh
+      - ./entrypoint_files/superset_startup.sh:/app/superset_startup.sh
     networks:
       - data-network
     healthcheck:
@@ -331,13 +342,12 @@ services:
       ICEBERG_FILE_FORMAT: "${ICEBERG_FILE_FORMAT}"
       MINIO_HOST: "${MINIO_HOST}"
       MINIO_PORT: "${MINIO_PORT}"
-      MINIO_ICEBERG_CATALOG_BUCKET: "${MINIO_ICEBERG_CATALOG_BUCKET}"
+      MINIO_ICEBERG_CATALOG_BUCKET: "${MINIO_CLICKSTREAM_TELEMETRY_BUCKET}"
       S3_PATH_STYLE_ACCESS: "${S3_PATH_STYLE_ACCESS}"
       AIRFLOW_FERNET_KEY: "${AIRFLOW_FERNET_KEY}"
       AIRFLOW_METADATA_DATABASE: "${AIRFLOW_METADATA_DATABASE}"
     volumes:
-      - ../platform_setup/dbt_project/dbt_project.yml:/app/dbt_project.yml
-      - ../clickstream_telemetry/data_loaders/dbt_models:/app/dbt_project/models
+      - ../clickstream_telemetry/data_loaders/dbt_project:/app/
     networks:
       - data-network
     healthcheck:

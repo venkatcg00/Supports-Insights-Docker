@@ -3,9 +3,6 @@ This script generates random support records based on allowed values from a SQLi
 creates temporary compressed CSV files (gzip) for each chunk in a MinIO bucket, combines them into a final
 compressed CSV file, and tracks progress in a SQLite checkpoints table. It supports configurable record counts via
 command-line arguments, chunk processing, and is designed to run under Data_Generator_Orchestrator.py.
-
-Product: Data Generator Suite
-Version: 1.0.0
 """
 import argparse
 import logging
@@ -18,7 +15,7 @@ from io import StringIO, BytesIO
 from typing import List, Union, Tuple
 import boto3
 from botocore.exceptions import ClientError, BotoCoreError
-from db_operations import connect_to_database, fetch_lookup_dictionary, checkpoint_management, get_last_execution_info, close_database_connection
+from db_operations import connect_to_database, fetch_lookup_list, checkpoint_management, get_last_execution_info, close_database_connection
 import os
 import sys
 import gc
@@ -409,19 +406,19 @@ def main() -> None:
     # Fetch allowed values
     try:
         SCRIPT_LOGGER.info("----- Fetching Allowed Values from SQLite -----")
-        support_categories = fetch_lookup_dictionary(
+        support_categories = fetch_lookup_list(
             conn=sqlite_connection,
             table_name="support_areas",
             source_name="CLIENT_GAMMA",
             column_name="support_area_name"
         )
-        agent_pseudo_names = fetch_lookup_dictionary(
+        agent_pseudo_names = fetch_lookup_list(
             conn=sqlite_connection,
             table_name="agents",
             source_name="CLIENT_GAMMA",
             column_name="pseudo_code"
         )
-        customer_types = fetch_lookup_dictionary(
+        customer_types = fetch_lookup_list(
             conn=sqlite_connection,
             table_name="customer_types",
             source_name="CLIENT_GAMMA",

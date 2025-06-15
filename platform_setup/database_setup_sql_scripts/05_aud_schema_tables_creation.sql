@@ -13,8 +13,9 @@ CREATE TABLE IF NOT EXISTS aud.dag_runs (
     update_count         INT,
     duplicate_count      INT,
     valid_count          INT,
-    validity_percentage  DECIMAL(5,2), -- Adjusted precision for clarity
+    validity_percentage  DECIMAL(5,2),
     run_duration         INTERVAL,
+    source_checkpoint    INT,
     CONSTRAINT fk_dag_runs_source_id
     FOREIGN KEY            (source_id) REFERENCES ds.sources(source_id)
                            ON DELETE RESTRICT
@@ -30,6 +31,7 @@ CREATE TABLE IF NOT EXISTS aud.data_error_history (
     source_id             INT          NOT NULL,
     error_type            TEXT         NOT NULL,
     error_description     TEXT         NOT NULL,
+    source_system_identifier TEXT       NOT NULL,
     source_record_id      INT          NOT NULL,
     is_active             BOOLEAN      NOT NULL DEFAULT TRUE,
     start_date            TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -51,6 +53,7 @@ CREATE TABLE IF NOT EXISTS aud.data_error_history (
 -- Indexes for aud.dag_runs
 CREATE INDEX IF NOT EXISTS idx_dag_runs_source_id ON aud.dag_runs(source_id);
 CREATE INDEX IF NOT EXISTS idx_dag_runs_status ON aud.dag_runs(dag_run_status);
+CREATE INDEX IF NOT EXISTS idx_dag_runs_source_checkpoint ON aud.dag_runs(source_checkpoint);
 CREATE INDEX IF NOT EXISTS idx_dag_runs_temporal ON aud.dag_runs(run_start_date, run_end_date);
 CREATE INDEX IF NOT EXISTS idx_dag_runs_validity_percentage ON aud.dag_runs(validity_percentage);
 

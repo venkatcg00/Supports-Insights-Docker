@@ -42,7 +42,7 @@ def connect_to_database() -> sqlite3.Connection:
     conn = sqlite3.connect(db_file, timeout=10)
     return conn
 
-def fetch_lookup_dictionary(
+def fetch_lookup_list(
     conn: sqlite3.Connection,
     table_name: str,
     source_name: str,

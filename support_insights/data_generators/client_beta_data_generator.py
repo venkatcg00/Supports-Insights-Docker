@@ -4,9 +4,6 @@ sends them to a Kafka topic in batches per chunk, and tracks progress in a SQLit
 configurable record counts via command-line arguments, chunk processing for efficient Kafka production, and is
 designed to run under Data_Generator_Orchestrator.py with a log file specified via the SCRIPT_LOG_FILE environment
 variable.
-
-Product: Data Generator Suite
-Version: 1.0.0
 """
 import random
 import os
@@ -20,7 +17,7 @@ import xml.etree.ElementTree as ET
 import argparse
 import sqlite3
 from confluent_kafka import Producer, KafkaError
-from db_operations import connect_to_database, fetch_lookup_dictionary, checkpoint_management, get_last_execution_info, close_database_connection
+from db_operations import connect_to_database, fetch_lookup_list, checkpoint_management, get_last_execution_info, close_database_connection
 
 DEFAULT_CHUNK_SIZE = 100
 MAX_UPDATE_PERCENTAGE = 0.25
@@ -289,19 +286,19 @@ def main() -> None:
     # Fetch allowed values
     try:
         SCRIPT_LOGGER.info("----- Fetching Allowed Values from SQLite -----")
-        support_categories = fetch_lookup_dictionary(
+        support_categories = fetch_lookup_list(
             conn=sqlite_connection,
             table_name="support_areas",
             source_name="CLIENT_BETA",
             column_name="support_area_name"
         )
-        agent_pseudo_names = fetch_lookup_dictionary(
+        agent_pseudo_names = fetch_lookup_list(
             conn=sqlite_connection,
             table_name="agents",
             source_name="CLIENT_BETA",
             column_name="pseudo_code"
         )
-        customer_types = fetch_lookup_dictionary(
+        customer_types = fetch_lookup_list(
             conn=sqlite_connection,
             table_name="customer_types",
             source_name="CLIENT_BETA",

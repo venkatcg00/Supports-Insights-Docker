@@ -1,10 +1,14 @@
-FROM bitnami/superset:4.1.2
+FROM apache/superset:b3f436a-py311
 
 USER root
 
 # Install essential dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    python3-dev \
+    libpq-dev \
     postgresql-client \
     nano \
     curl \
@@ -14,17 +18,21 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/*
 
-# Install psycopg2-binary and Pillow
-RUN pip install --no-cache-dir psycopg2-binary==2.9.10 Pillow==10.4.0 && \
+# Install Superset engine plugins and extras
+RUN pip install --no-cache-dir \
+    psycopg2-binary \
+    psycopg2 \
+    Pillow \
+    trino[sqlalchemy] \
+    apache-superset[trino] && \
     rm -rf /root/.cache/pip/* /tmp/*
 
-# Create dashboard directories and set permissions
+# Setup dashboard directories and permissions
 RUN mkdir -p /app/superset_home/clickstream_telemetry/dashboards \
     /app/superset_home/support_insights/dashboards && \
-    chown -R 1001:1001 /app/superset_home && \
+    chown -R superset:superset /app/superset_home && \
     chmod -R 755 /app/superset_home
 
-USER 1001
+USER superset
 
-# Use custom entrypoint
 ENTRYPOINT ["/app/superset_startup.sh"]

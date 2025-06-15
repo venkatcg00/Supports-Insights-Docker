@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS pre_dm.customer_support_stage (
     customer_rating        INTEGER,
     dag_run_id             INT,
     is_valid               BOOLEAN,
-    record_status          TEXT
+    start_date              TIMESTAMP
 ) PARTITION BY LIST (source_id);
 
 -- Create partitions for specific source_id values

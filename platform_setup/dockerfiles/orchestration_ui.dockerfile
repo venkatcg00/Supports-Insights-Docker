@@ -1,4 +1,4 @@
-FROM python:3.12.10-slim
+FROM python:3.11-slim
 
 # Install system dependencies in a single layer and clean up
 RUN apt-get update && \
@@ -12,14 +12,12 @@ RUN apt-get update && \
 
 # Pre-install Python packages with version locking
 RUN pip install --no-cache-dir \
-    pymongo==4.10.1 \
-    aiohttp==3.10.10 \
-    boto3==1.35.39 \
-    confluent-kafka==2.5.3 \
-    tenacity==8.5.0 \
-    pytest==8.3.3 \
-    pytest-mock==3.14.0 \
-    avro-python3==1.10.2 && \
+    pymongo \
+    aiohttp \
+    boto3 \
+    confluent-kafka \
+    tenacity \
+    avro-python3 && \
     # Clean up pip cache and temporary files
     rm -rf /root/.cache/pip/* /tmp/*
 

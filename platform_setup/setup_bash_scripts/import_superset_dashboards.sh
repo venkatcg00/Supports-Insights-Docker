@@ -50,7 +50,7 @@ for DIR in "${DASHBOARD_DIRS[@]}"; do
         if [ -f \"\$f\" ]; then
           FOUND=1
           echo \"[IMPORTING] \$f\"
-          /opt/bitnami/superset/venv/bin/superset import-dashboards --path \"\$f\"
+          superset import-dashboards --path \"\$f\"
         fi
       done
       if [ \"\$FOUND\" -eq 0 ]; then
