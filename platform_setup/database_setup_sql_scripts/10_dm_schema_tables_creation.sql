@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS dm.customer_support_fact (
     customer_rating        INTEGER,
     dag_run_id             INT          NOT NULL,
     is_valid               BOOLEAN      NOT NULL,
-    is_active              BOOLEAN      NOT NULL,
+    is_active              BOOLEAN      NOT NULL DEFAULT TRUE,
     start_date             TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     end_date               TIMESTAMP    NOT NULL DEFAULT '9999-12-31 23:59:59',
     CONSTRAINT fk_customer_support_fact_source_id

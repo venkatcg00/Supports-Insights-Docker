@@ -29,7 +29,7 @@ while true; do
   UNHEALTHY_CONTAINERS=$(docker ps --filter "health=unhealthy" --format '{{.Names}}')
   STARTING_CONTAINERS=$(docker ps --filter "health=starting" --format '{{.Names}}')
   HEALTHY_COUNT=$(docker ps --filter "health=healthy" --format '{{.Names}}' | wc -l)
-  TOTAL_EXPECTED=$(docker-compose ps --services | wc -l)
+  TOTAL_EXPECTED=$(docker compose ps --services | wc -l)
 
   if [ -z "$UNHEALTHY_CONTAINERS" ] && [ -z "$STARTING_CONTAINERS" ] && [ "$HEALTHY_COUNT" -eq "$TOTAL_EXPECTED" ]; then
     echo "[SUCCESS] All containers are healthy."

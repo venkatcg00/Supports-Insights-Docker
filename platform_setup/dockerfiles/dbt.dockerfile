@@ -1,4 +1,4 @@
-FROM python:3.12.10-slim
+FROM python:3.11-slim
 
 # Install dependencies
 RUN apt-get update && apt-get install -y \
@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Install dbt-core and dbt-trino
-RUN pip install --no-cache-dir dbt-core==1.8.6 dbt-trino==1.8.1
+RUN pip install --no-cache-dir dbt-core dbt-trino
 
 # Copy dbt profiles.yml
 COPY profiles.yml /root/.dbt/profiles.yml

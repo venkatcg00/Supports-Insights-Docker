@@ -49,8 +49,8 @@ add_connection() {
 add_connection "postgres_project_connection" \
   "postgresql://${PROJECT_USER}:${PROJECT_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DATABASE_NAME}"
 
-add_connection "mongo_project_connection" \
-  "mongo://${PROJECT_USER}:${PROJECT_PASSWORD}@${MONGO_HOST}:${MONGO_PORT}/${MONGO_DATABASE_NAME}"
+MONGO_CONN_URI="mongo://${PROJECT_USER}:${PROJECT_PASSWORD}@${MONGO_HOST}:${MONGO_PORT}/${MONGO_DATABASE_NAME}?authSource=admin"
+add_connection "mongo_project_connection" "$MONGO_CONN_URI"
 
 add_connection "kafka_project_connection" \
   "kafka://${KAFKA_BROKER_HOST}:${KAFKA_BROKER_PORT}"
@@ -58,10 +58,28 @@ add_connection "kafka_project_connection" \
 add_connection "spark_project_connection" \
   "spark://${SPARK_MASTER_HOST}:${SPARK_MASTER_PORT}"
 
-add_connection "s3_project_connection" \
-  "s3://${PROJECT_USER}:${PROJECT_PASSWORD}@${MINIO_HOST}:${MINIO_PORT}"
-
 add_connection "trino_project_connection" \
   "trino://${PROJECT_USER}:${PROJECT_PASSWORD}@${TRINO_HOST}:${TRINO_HTTP_PORT}/iceberg"
 
+# Handle minio_project_connection separately due to --conn-extra (not URI)
+echo -n "[INFO] Checking minio_project_connection... "
+if docker exec "$AIRFLOW_CONTAINER" airflow connections get "minio_project_connection" >/dev/null 2>&1; then
+  echo "exists → deleting"
+  docker exec "$AIRFLOW_CONTAINER" airflow connections delete "minio_project_connection"
+else
+  echo "not found"
+fi
+
+echo "[ADD] Creating minio_project_connection"
+docker exec "$AIRFLOW_CONTAINER" airflow connections add "minio_project_connection" \
+  --conn-type aws \
+  --conn-extra '{
+    "host": "http://'${MINIO_HOST}':'${MINIO_PORT}'",
+    "aws_access_key_id": "'${PROJECT_USER}'",
+    "aws_secret_access_key": "'${PROJECT_PASSWORD}'",
+    "endpoint_url": "http://'${MINIO_HOST}':'${MINIO_PORT}'",
+    "region_name": "us-east-1",
+    "verify": false
+  }'
+  
 echo "[SUCCESS] All Airflow project connections created or updated."

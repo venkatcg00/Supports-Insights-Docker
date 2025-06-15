@@ -16,12 +16,12 @@ BEGIN
 
     -- Insert the new record (for INSERT, UPDATE, or DELETE)
     IF TG_OP = 'DELETE' THEN
-        INSERT INTO dwh.ds_sources (source_id, source_name, source_file_type, dataload_strategy, last_loaded_record_id, description, is_active, start_date, end_date, dml_operation)
-        VALUES (OLD.source_id, OLD.source_name, OLD.source_file_type, OLD.dataload_strategy, OLD.last_loaded_record_id, OLD.description, FALSE, OLD.start_date, CURRENT_TIMESTAMP, TG_OP);
+        INSERT INTO dwh.ds_sources (source_id, source_name, source_file_type, data_nature, description, is_active, start_date, end_date, dml_operation)
+        VALUES (OLD.source_id, OLD.source_name, OLD.source_file_type, OLD.data_nature, OLD.description, FALSE, OLD.start_date, CURRENT_TIMESTAMP, TG_OP);
         RETURN OLD;
     ELSE
-        INSERT INTO dwh.ds_sources (source_id, source_name, source_file_type, dataload_strategy, last_loaded_record_id, description, is_active, start_date, end_date, dml_operation)
-        VALUES (NEW.source_id, NEW.source_name, NEW.source_file_type, NEW.dataload_strategy, NEW.last_loaded_record_id, NEW.description, TRUE, CURRENT_TIMESTAMP, '9999-12-31 23:59:59', TG_OP);
+        INSERT INTO dwh.ds_sources (source_id, source_name, source_file_type, data_nature, description, is_active, start_date, end_date, dml_operation)
+        VALUES (NEW.source_id, NEW.source_name, NEW.source_file_type, NEW.data_nature, NEW.description, TRUE, CURRENT_TIMESTAMP, '9999-12-31 23:59:59', TG_OP);
         RETURN NEW;
     END IF;
 END;
@@ -260,24 +260,44 @@ EXECUTE FUNCTION trg_fn_sync_info_data_dictionary_to_dwh();
 CREATE OR REPLACE FUNCTION trg_fn_sync_aud_dag_runs_to_dwh()
 RETURNS TRIGGER AS $$
 BEGIN
-    -- If this is an update, mark the previous record as inactive
+    -- Mark previous record as inactive on UPDATE
     IF TG_OP = 'UPDATE' THEN
         UPDATE dwh.aud_dag_runs
-        SET end_date = CURRENT_TIMESTAMP,
+        SET run_end_date = CURRENT_TIMESTAMP,
             is_active = FALSE
         WHERE dag_run_id = NEW.dag_run_id
-          AND end_date = '9999-12-31 23:59:59'
+          AND run_end_date = '9999-12-31 23:59:59'
           AND is_active = TRUE;
     END IF;
 
-    -- Insert the new record (for INSERT, UPDATE, or DELETE)
+    -- Insert new record into DWH for INSERT, UPDATE, or DELETE
     IF TG_OP = 'DELETE' THEN
-        INSERT INTO dwh.aud_dag_runs (dag_run_id, airflow_dag_run_id, source_id, dag_run_status, run_start_date, run_end_date, batch_count, insert_count, update_count, duplicate_count, valid_count, validity_percentage, run_duration, is_active, start_date, end_date, dml_operation)
-        VALUES (OLD.dag_run_id, OLD.airflow_dag_run_id, OLD.source_id, OLD.dag_run_status, OLD.run_start_date, OLD.run_end_date, OLD.batch_count, OLD.insert_count, OLD.update_count, OLD.duplicate_count, OLD.valid_count, OLD.validity_percentage, OLD.run_duration, FALSE, OLD.start_date, CURRENT_TIMESTAMP, TG_OP);
+        INSERT INTO dwh.aud_dag_runs (
+            dag_run_id, airflow_dag_run_id, source_id, dag_run_status,
+            run_start_date, run_end_date, batch_count, insert_count, update_count,
+            duplicate_count, valid_count, validity_percentage, run_duration,
+            source_checkpoint, is_active, dml_operation
+        )
+        VALUES (
+            OLD.dag_run_id, OLD.airflow_dag_run_id, OLD.source_id, OLD.dag_run_status,
+            OLD.run_start_date, CURRENT_TIMESTAMP, OLD.batch_count, OLD.insert_count, OLD.update_count,
+            OLD.duplicate_count, OLD.valid_count, OLD.validity_percentage, OLD.run_duration,
+            OLD.source_checkpoint, FALSE, TG_OP
+        );
         RETURN OLD;
     ELSE
-        INSERT INTO dwh.aud_dag_runs (dag_run_id, airflow_dag_run_id, source_id, dag_run_status, run_start_date, run_end_date, batch_count, insert_count, update_count, duplicate_count, valid_count, validity_percentage, run_duration, is_active, start_date, end_date, dml_operation)
-        VALUES (NEW.dag_run_id, NEW.airflow_dag_run_id, NEW.source_id, NEW.dag_run_status, NEW.run_start_date, NEW.run_end_date, NEW.batch_count, NEW.insert_count, NEW.update_count, NEW.duplicate_count, NEW.valid_count, NEW.validity_percentage, NEW.run_duration, TRUE, CURRENT_TIMESTAMP, '9999-12-31 23:59:59', TG_OP);
+        INSERT INTO dwh.aud_dag_runs (
+            dag_run_id, airflow_dag_run_id, source_id, dag_run_status,
+            run_start_date, run_end_date, batch_count, insert_count, update_count,
+            duplicate_count, valid_count, validity_percentage, run_duration,
+            source_checkpoint, is_active, dml_operation
+        )
+        VALUES (
+            NEW.dag_run_id, NEW.airflow_dag_run_id, NEW.source_id, NEW.dag_run_status,
+            NEW.run_start_date, '9999-12-31 23:59:59', NEW.batch_count, NEW.insert_count, NEW.update_count,
+            NEW.duplicate_count, NEW.valid_count, NEW.validity_percentage, NEW.run_duration,
+            NEW.source_checkpoint, TRUE, TG_OP
+        );
         RETURN NEW;
     END IF;
 END;

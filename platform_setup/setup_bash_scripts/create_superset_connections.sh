@@ -40,7 +40,7 @@ TEMP_YAML="$HOME/tmp/protected_superset_dbs.yaml"
 cat <<EOF > "$TEMP_YAML"
 databases:
   - database_name: Postgres_Project_DB
-    sqlalchemy_uri: postgresql://${POSTGRES_DEFAULT_USER}:${PROJECT_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${SUPERSET_METADATA_DATABASE}
+    sqlalchemy_uri: postgresql://${POSTGRES_DEFAULT_USER}:${PROJECT_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DATABASE_NAME}
     extra: "{}"
     allow_dml: true
   - database_name: Trino_Project_DB
@@ -54,9 +54,9 @@ docker cp "$TEMP_YAML" "$SUPERSET_CONTAINER:/tmp/protected_superset_dbs.yaml"
 
 # Import database connections
 echo "[INFO] Importing database connections..."
-if ! docker exec "$SUPERSET_CONTAINER" /opt/bitnami/superset/venv/bin/superset import-datasources --path /tmp/protected_superset_dbs.yaml 2>&1 | tee import.log; then
+if ! docker exec "$SUPERSET_CONTAINER" superset import-datasources --path /tmp/protected_superset_dbs.yaml 2>&1; then
   echo "[ERROR] Failed to import datasources. Check Superset version and supported flags."
-  echo "[INFO] Run 'docker exec $SUPERSET_CONTAINER /opt/bitnami/superset/venv/bin/superset import-datasources --help' for available options."
+  echo "[INFO] Run 'docker exec $SUPERSET_CONTAINER superset import-datasources --help' for available options."
   rm -f "$TEMP_YAML"
   docker exec -u root "$SUPERSET_CONTAINER" rm -f /tmp/protected_superset_dbs.yaml || echo "[WARNING] Failed to remove /tmp/protected_superset_dbs.yaml in container"
   exit 1
