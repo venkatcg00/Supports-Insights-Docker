@@ -163,7 +163,8 @@ def generate_and_update_records(
                     interaction_id, support_categories, agent_pseudo_names, customer_types
                 )
 
-                if random.random() < 0.1 and null_records < max_nulls:
+                # if random.random() < 0.1 and null_records < max_nulls:
+                if random.random() < 0.1:
                     key_to_nullify = random.choice(
                         [
                             "SUPPORT_CATEGORY", "AGENT_PSEUDO_NAME", "CONTACT_DATE",
@@ -185,7 +186,8 @@ def generate_and_update_records(
                 ))
                 new_records += 1
 
-                if update_records < max_updates and random.random() < 0.25 and highest_interaction_id > 1:
+                # if update_records < max_updates and random.random() < 0.25 and highest_interaction_id > 1:
+                if random.random() < 0.25 and highest_interaction_id > 1:
                     serial_number += 1
                     update_interaction_id = random.randint(1, highest_interaction_id)
                     update_record = generate_random_record(

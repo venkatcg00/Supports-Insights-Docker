@@ -215,7 +215,7 @@ def generate_random_record(
         str(record_id),
         random.choice(support_categories),
         random.choice(agent_pseudo_names),
-        (datetime.now(timezone.utc) - timedelta(minutes=duration)).strftime("%m%d%Y%H%M%S"),
+        (datetime.now(timezone.utc) - timedelta(days=random.randint(0, 1000))).strftime("%m%d%Y%H%M%S"),
         random.choice(["COMPLETED", "DROPPED", "TRANSFERRED"]),
         random.choice(["CALL", "CHAT", "EMAIL"]),
         random.choice(customer_types),
@@ -284,7 +284,8 @@ def generate_and_update_records(
                 record_id += 1
                 new_record = generate_random_record(record_id, support_categories, agent_pseudo_names, customer_types)
 
-                if random.random() < 0.1 and null_records < max_nulls:
+                # if random.random() < 0.1 and null_records < max_nulls:
+                if random.random() < 0.1:
                     idx_to_nullify = random.randint(1, 12)
                     new_record[idx_to_nullify] = None
                     null_records += 1
@@ -294,7 +295,8 @@ def generate_and_update_records(
                 chunk_data.append(new_record)
                 new_records += 1
 
-                if update_records < max_updates and random.random() < 0.25 and highest_record_id > 1:
+                # if update_records < max_updates and random.random() < 0.25 and highest_record_id > 1:
+                if random.random() < 0.25 and highest_record_id > 1:
                     update_record_id = random.randint(1, highest_record_id)
                     updated_record = generate_random_record(update_record_id, support_categories, agent_pseudo_names, customer_types)
                     chunk_data.append(updated_record)
