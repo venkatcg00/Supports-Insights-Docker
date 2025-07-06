@@ -146,7 +146,7 @@ def client_gamma_etl_dag():
                     gz_buffer.seek(0)
 
                     with gzip.open(gz_buffer, 'rt') as f_in:
-                        pdf = pd.read_csv(f_in, delimiter="|", header=0 if i == 0 else None, dtype=str, keep_default_na=False, na_values=[])
+                        pdf = pd.read_csv(f_in, delimiter="|", header=0, skiprows=1 if i > 0 else 0, dtype=str, keep_default_na=False, na_values=[])
                     sdf = spark.createDataFrame(pdf)
                     for col_name in sdf.columns:
                         sdf = sdf.withColumn(col_name, when(col(col_name) == "", None).otherwise(col(col_name)))
@@ -471,11 +471,11 @@ def client_gamma_etl_dag():
                     .option("driver", "org.postgresql.Driver") \
                     .load()
 
-                create_temp_table('dm', 'temp_table', 'source_system_identifier', 'TEXT')
+                create_temp_table('dm', 'temp_table_cg', 'source_system_identifier', 'TEXT')
                 df.filter(col("merge_type") == "UPDATE").select("source_system_identifier").write \
                     .format("jdbc") \
                     .option("url", jdbc_url) \
-                    .option("dbtable", "dm.temp_table") \
+                    .option("dbtable", "dm.temp_table_cg") \
                     .option("user", user) \
                     .option("password", password) \
                     .option("driver", "org.postgresql.Driver") \
@@ -485,10 +485,10 @@ def client_gamma_etl_dag():
                 pg_hook.run("""
                     UPDATE dm.customer_support_fact AS main
                     SET is_active = FALSE, end_date = CURRENT_TIMESTAMP
-                    FROM dm.temp_table AS tmp
+                    FROM dm.temp_table_cg AS tmp
                     WHERE main.is_active = TRUE AND main.source_system_identifier = tmp.source_system_identifier
                 """)
-                drop_temp_table('dm', 'temp_table')
+                drop_temp_table('dm', 'temp_table_cg')
 
                 df.select(
                     "source_id", "source_record_id", "source_system_identifier",

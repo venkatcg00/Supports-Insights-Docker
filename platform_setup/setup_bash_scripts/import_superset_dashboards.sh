@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Script: import_superset_dashboards.sh
-# Description: Imports dashboards into Superset from clickstream and support folders (idempotent).
+# Description: Imports dashboards into Superset from ZIP file(s) placed in bind path (idempotent).
 
 set -e
 
@@ -34,32 +34,23 @@ until docker exec "$SUPERSET_CONTAINER" curl -f http://localhost:8088/health > /
 done
 echo "[INFO] Superset is healthy."
 
-echo "[INFO] Importing dashboards into Superset..."
+echo "[INFO] Importing dashboard ZIP exports into Superset..."
 
-DASHBOARD_DIRS=(
-  "/app/bitnami/superset_home/clickstream_telemetry/dashboards"
-  "/app/bitnami/superset_home/support_insights/dashboards"
+ZIP_PATHS=(
+  "/app/bitnami/superset_home/clickstream_telemetry/dashboard_export.zip"
+  "/app/bitnami/superset_home/support_insights/dashboard_export.zip"
 )
 
-for DIR in "${DASHBOARD_DIRS[@]}"; do
-  echo "[IMPORT] Scanning directory: $DIR"
+for ZIP in "${ZIP_PATHS[@]}"; do
+  echo "[IMPORT] Checking for ZIP: $ZIP"
   docker exec "$SUPERSET_CONTAINER" sh -c "
-    if [ -d \"$DIR\" ]; then
-      FOUND=0
-      for f in \"$DIR\"/*.json; do
-        if [ -f \"\$f\" ]; then
-          FOUND=1
-          echo \"[IMPORTING] \$f\"
-          superset import-dashboards --path \"\$f\"
-        fi
-      done
-      if [ \"\$FOUND\" -eq 0 ]; then
-        echo \"[INFO] No dashboards found in $DIR\"
-      fi
+    if [ -f \"$ZIP\" ]; then
+      echo \"[IMPORTING ZIP] $ZIP\"
+      superset import-dashboards --path \"$ZIP\" --username \"$PROJECT_USER\"
     else
-      echo \"[SKIP] Directory does not exist: $DIR\"
+      echo \"[SKIP] ZIP file not found: $ZIP\"
     fi
   "
 done
 
-echo "[SUCCESS] Dashboard import process completed — either imported new dashboards or none were present."
+echo "[SUCCESS] Dashboard import from ZIP files completed."

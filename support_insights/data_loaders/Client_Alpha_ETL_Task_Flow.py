@@ -438,11 +438,11 @@ def client_alpha_etl_dag():
                     .option("driver", "org.postgresql.Driver") \
                     .load()
 
-                create_temp_table('dm', 'temp_table', 'source_system_identifier', 'TEXT')
+                create_temp_table('dm', 'temp_table_ca', 'source_system_identifier', 'TEXT')
                 df.filter(col("merge_type") == "UPDATE").select("source_system_identifier").write \
                     .format("jdbc") \
                     .option("url", jdbc_url) \
-                    .option("dbtable", "dm.temp_table") \
+                    .option("dbtable", "dm.temp_table_ca") \
                     .option("user", user) \
                     .option("password", password) \
                     .option("driver", "org.postgresql.Driver") \
@@ -452,10 +452,10 @@ def client_alpha_etl_dag():
                 pg_hook.run("""
                     UPDATE dm.customer_support_fact AS main
                     SET is_active = FALSE, end_date = CURRENT_TIMESTAMP
-                    FROM dm.temp_table AS tmp
+                    FROM dm.temp_table_ca AS tmp
                     WHERE main.is_active = TRUE AND main.source_system_identifier = tmp.source_system_identifier
                 """)
-                drop_temp_table('dm', 'temp_table')
+                drop_temp_table('dm', 'temp_table_ca')
 
                 df.select(
                     "source_id", "source_record_id", "source_system_identifier",

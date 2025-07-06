@@ -308,7 +308,8 @@ async def script_runner(script_name: str, script_status: Dict[str, Dict[str, Any
     """
     SCRIPT_LOGGER.info("----- Starting Script Runner for %s -----", script_name)
     while script_status[script_name]["running"]:
-        input_value = random.randint(1_000_000, 2_000_000) if random.random() < 0.05 else random.randint(100, 100_000)
+        # input_value = random.randint(1_000_000, 2_000_000) if random.random() < 0.05 else random.randint(100, 100_000)
+        input_value = random.randint(100, 100_000)
         delay = random.randint(30, 300)
         SCRIPT_LOGGER.info("Generated input_value=%d, delay=%d seconds", input_value, delay)
 
