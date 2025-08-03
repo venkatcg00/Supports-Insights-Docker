@@ -16,6 +16,7 @@ RUN pip install --no-cache-dir \
     aiohttp \
     boto3 \
     confluent-kafka \
+    faker \
     tenacity \
     avro-python3 && \
     # Clean up pip cache and temporary files
