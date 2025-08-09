@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # Script: create_postgres_user.sh
-# Description: Generates 17_user_creation.sql in correct order to create and grant privileges to the project user.
+# Description: Generates 16_user_creation.sql in correct order to create and grant privileges to the project user.
 # Requirements: Must be sourced after .env is loaded and used after schema creation SQLs.
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-SQL_OUTPUT="$PROJECT_ROOT/database_setup_sql_scripts/17_user_creation.sql"
+SQL_OUTPUT="$PROJECT_ROOT/database_setup_sql_scripts/16_user_creation.sql"
 
 # Source .env if not already sourced
 if [ -z "$PROJECT_USER" ]; then
@@ -26,7 +26,6 @@ REQUIRED_VARS=(
   POSTGRES_DATABASE_NAME
   AIRFLOW_METADATA_DATABASE
   SUPERSET_METADATA_DATABASE
-  HIVE_METASTORE_DATABASE
 )
 
 for var in "${REQUIRED_VARS[@]}"; do
@@ -57,7 +56,6 @@ ALTER ROLE "${PROJECT_USER}" WITH SUPERUSER CREATEDB CREATEROLE INHERIT LOGIN;
 GRANT ALL PRIVILEGES ON DATABASE ${POSTGRES_DATABASE_NAME} TO "${PROJECT_USER}";
 GRANT ALL PRIVILEGES ON DATABASE ${AIRFLOW_METADATA_DATABASE} TO "${PROJECT_USER}";
 GRANT ALL PRIVILEGES ON DATABASE ${SUPERSET_METADATA_DATABASE} TO "${PROJECT_USER}";
-GRANT ALL PRIVILEGES ON DATABASE ${HIVE_METASTORE_DATABASE} TO "${PROJECT_USER}";
 
 -- Set search_path
 ALTER ROLE "${PROJECT_USER}" SET search_path TO ds, info, aud, lnd, cdc, prs, pre_dm, dm, dwh, vw, public;

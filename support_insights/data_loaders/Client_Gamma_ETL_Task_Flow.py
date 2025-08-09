@@ -38,15 +38,12 @@ DEFAULT_ARGS = {
 }
 
 def get_spark_session(app_name: str) -> SparkSession:
-    """Create a Spark session optimized for local container with memory constraints."""
+    """Create a Spark session."""
     try:
-        conn = BaseHook.get_connection("spark_project_connection")
         spark = (SparkSession.builder \
             .appName(app_name) \
-            .master(f"spark://{conn.host}:{conn.port}") \
+            .master("local[*]") \
             .config("spark.jars", "/opt/spark/jars/postgresql-jdbc.jar") \
-            .config("spark.driver.extraJavaOptions", "-Dlog4j.configurationFile=file:/opt/spark/conf/log4j2.properties")
-            .config("spark.executor.extraJavaOptions", "-Dlog4j.configurationFile=file:/opt/spark/conf/log4j2.properties")
             .getOrCreate()
         )
         spark.sparkContext.setLogLevel("INFO")
