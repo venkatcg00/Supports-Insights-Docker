@@ -22,6 +22,8 @@ RUN pip install --no-cache-dir \
     # Clean up pip cache and temporary files
     rm -rf /root/.cache/pip/* /tmp/*
 
+RUN pip install faker
+
 # Create directories
 RUN mkdir -p /app && \
     mkdir -p /app/scripts && \
