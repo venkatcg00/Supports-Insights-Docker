@@ -43,22 +43,6 @@ databases:
     sqlalchemy_uri: postgresql://${POSTGRES_DEFAULT_USER}:${PROJECT_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DATABASE_NAME}
     extra: "{}"
     allow_dml: true
-  - database_name: Trino_Project_DB
-    sqlalchemy_uri: trino://${PROJECT_USER}@${TRINO_HOST}:8080/iceberg
-    extra: |
-      {
-        "engine_config": {
-          "connect_args": {
-            "catalog": "iceberg",
-            "schema": "default",
-            "http_scheme": "http",
-            "s3_endpoint": "http://${MINIO_HOST}:${MINIO_PORT}",
-            "s3_path_style_access": ${S3_PATH_STYLE_ACCESS},
-            "s3_bucket": "${MINIO_ICEBERG_CATALOG_BUCKET}"
-          }
-        }
-      }
-    allow_dml: true
 EOF
 
 # Copy YAML file to container

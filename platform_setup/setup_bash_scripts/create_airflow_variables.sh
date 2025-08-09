@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Script: create_airflow_variables.sh
-# Description: Adds *_BUCKET and *_TOPIC variables from .env as Airflow variables inside Bitnami Airflow container.
+# Description: Adds *_BUCKET and *_TOPIC variables from .env as Airflow variables inside Airflow container.
 
 set -e
 

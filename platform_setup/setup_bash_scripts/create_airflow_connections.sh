@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Script: create_airflow_connections.sh
-# Description: Creates Airflow connections using CLI inside Bitnami Airflow container (Airflow 3, idempotent).
+# Description: Creates Airflow connections using CLI inside Airflow container (Airflow 3, idempotent).
 
 set -e
 
@@ -54,9 +54,6 @@ add_connection "mongo_project_connection" "$MONGO_CONN_URI"
 
 add_connection "kafka_project_connection" \
   "kafka://${KAFKA_BROKER_HOST}:${KAFKA_BROKER_PORT}"
-
-add_connection "spark_project_connection" \
-  "spark://${SPARK_MASTER_HOST}:${SPARK_MASTER_PORT}"
 
 add_connection "trino_project_connection" \
   "trino://${PROJECT_USER}:${PROJECT_PASSWORD}@${TRINO_HOST}:${TRINO_HTTP_PORT}/iceberg"

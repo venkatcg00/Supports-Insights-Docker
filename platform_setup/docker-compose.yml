@@ -120,18 +120,13 @@ services:
       MINIO_USER: "${PROJECT_USER}"
       MINIO_PASSWORD: "${PROJECT_PASSWORD}"
       MINIO_CLIENT_GAMMA_STORAGE_BUCKET: "${MINIO_CLIENT_GAMMA_STORAGE_BUCKET}"
-      MINIO_CLICKSTREAM_TELEMETRY_BUCKET: "${MINIO_CLICKSTREAM_TELEMETRY_BUCKET}"
       KAFKA_BOOTSTRAP_SERVERS: "${KAFKA_BOOTSTRAP_SERVERS}"
-      KAFKA_CLICKSTREAM_USER_BEHAVIOUR_TOPIC: "${KAFKA_CLICKSTREAM_USER_BEHAVIOUR_TOPIC}"
-      KAFKA_TELEMETRY_VEHICLE_STATS_TOPIC: "${KAFKA_TELEMETRY_VEHICLE_STATS_TOPIC}"
-      KAFKA_ANALYTICS_SESSION_DURATION_TOPIC: "${KAFKA_ANALYTICS_SESSION_DURATION_TOPIC}"
       KAFKA_CLIENT_BETA_STORAGE_TOPIC: "${KAFKA_CLIENT_BETA_STORAGE_TOPIC}"
       CHUNK_SIZE: 10000
       SQLITE_DB_FILE: "/app/storage/orchestrator.db"
     volumes:
       - orchestration_ui_data:/app
       - ../support_insights/data_generators:/app/scripts/support_insights
-      - ../clickstream_telemetry/data_generators:/app/scripts/clickstream_telemetry
       - ./entrypoint_files/data_generator_orchestrator.py:/app/scripts/python_scripts_orchestrator/data_generator_orchestrator.py
       - ./entrypoint_files/orchestration_ui_startup.sh:/app/orchestration_ui_startup.sh
       - ./entrypoint_files/sqlite3_db_setup.sql:/app/sqlite3_db_setup.sql
@@ -147,40 +142,6 @@ services:
     networks:
       - data-network
     mem_limit: 1g
-
-  spark:
-    build:
-      context: ../platform_setup
-      dockerfile: ../platform_setup/dockerfiles/spark.dockerfile
-    container_name: spark
-    environment:
-      SPARK_MODE: master
-      SPARK_WORKER_INSTANCES: 1
-      SPARK_WORKER_MEMORY: 1G
-      SPARK_RPC_AUTHENTICATION_ENABLED: "false"
-      SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED: "false"
-      SPARK_SSL_ENABLED: "false"
-      PYSPARK_PYTHON: /usr/bin/python3.11
-      PYSPARK_DRIVER_PYTHON: /usr/bin/python3.11
-      SPARK_CONF_DIR: /opt/spark/conf
-    ports:
-      - "7077:7077"
-      - "1234:8080"
-    volumes:
-      - ./entrypoint_files/postgresql-jdbc.jar:/opt/spark/jars/postgresql-jdbc.jar
-      - ./entrypoint_files/spark_startup.sh:/spark_startup.sh
-      - ./entrypoint_files/log4j2.properties:/opt/spark/conf/log4j2.properties
-    command: >
-      /bin/bash /spark_startup.sh
-    networks:
-      - data-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-    mem_limit: 6g
 
   airflow:
     build:
@@ -224,7 +185,6 @@ services:
       AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
     volumes:
       - ../support_insights/data_loaders:/opt/airflow/dags/support_insights
-      - ../clickstream_telemetry/data_loaders/airflow_dags:/opt/airflow/dags/clickstream_telemetry
       - ./entrypoint_files/postgresql-jdbc.jar:/opt/spark/jars/postgresql-jdbc.jar
       - airflow_logs:/opt/airflow/logs
     ports:
@@ -242,47 +202,6 @@ services:
       start_period: 60s
     networks:
       - data-network
-
-  trino:
-    image: trinodb/trino:475
-    container_name: trino
-    restart: always
-    ports:
-      - "8082:8080"
-    depends_on:
-      postgresql:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    environment:
-      POSTGRES_HOST: "${POSTGRES_HOST}"
-      POSTGRES_PORT: "${POSTGRES_PORT}"
-      POSTGRES_DEFAULT_USER: "${POSTGRES_DEFAULT_USER}"
-      POSTGRES_PASSWORD: "${PROJECT_PASSWORD}"
-      HIVE_METASTORE_DATABASE: "${HIVE_METASTORE_DATABASE}"
-      MINIO_HOST: "${MINIO_HOST}"
-      MINIO_PORT: "${MINIO_PORT}"
-      MINIO_CLICKSTREAM_TELEMETRY_BUCKET: "${MINIO_CLICKSTREAM_TELEMETRY_BUCKET}"
-      PROJECT_USER: "${PROJECT_USER}"
-      PROJECT_PASSWORD: "${PROJECT_PASSWORD}"
-      ICEBERG_FILE_FORMAT: "${ICEBERG_FILE_FORMAT}"
-      S3_PATH_STYLE_ACCESS: "${S3_PATH_STYLE_ACCESS}"
-      TRINO_HTTP_PORT: "8082"
-      TRINO_ENVIRONMENT: "${TRINO_ENVIRONMENT}"
-      TRINO_DATA_DIR: "${TRINO_DATA_DIR}"
-    volumes:
-    - ./entrypoint_files/trino_startup.sh:/trino_startup.sh
-    command: >
-      /bin/bash /trino_startup.sh
-    networks:
-      - data-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/info"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 60s
-    mem_limit: 1.2g
 
   superset:
     build:
@@ -313,8 +232,7 @@ services:
       postgresql:
         condition: service_healthy
     volumes:
-      - ../clickstream_telemetry/data_dashboards:/app/bitnami/superset_home/clickstream_telemetry
-      - ../support_insights/data_dashboards:/app/bitnami/superset_home/support_insights
+      - ../support_insights/data_dashboards:/app/superset_home/support_insights
       - ./entrypoint_files/superset_startup.sh:/app/superset_startup.sh
     networks:
       - data-network

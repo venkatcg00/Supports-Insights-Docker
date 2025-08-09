@@ -96,7 +96,6 @@ def discover_scripts() -> Dict[str, Dict[str, Any]]:
     SCRIPT_LOGGER.info("----- Discovering Scripts -----")
     script_dirs = [
         "/app/scripts/support_insights",
-        "/app/scripts/clickstream_telemetry",
         "/app/scripts/python_scripts_orchestrator"
     ]
     scripts: Dict[str, Dict[str, Any]] = {}

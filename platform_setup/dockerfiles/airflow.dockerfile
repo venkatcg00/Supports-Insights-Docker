@@ -16,9 +16,7 @@ RUN pip install --no-cache-dir \
     pandas \
     polars \
     pyspark==3.5.6 \
-    avro-python3 \
     pymongo \
     dnspython \
     asyncpg \
-    connexion[swagger-ui] \
-    pyarrow
+    connexion[swagger-ui]

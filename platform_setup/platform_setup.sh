@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Script: platform_setup.sh
-# Description: Orchestrates the entire setup of the Insights & Telemetry Platform.
+# Description: Orchestrates the entire setup of the Support Insights Platform.
 # Usage: ./platform_setup.sh [--reset]
 
 set -e

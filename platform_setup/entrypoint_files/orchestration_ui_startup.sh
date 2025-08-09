@@ -55,11 +55,7 @@ EXPECTED_ENV_VARS=(
     MINIO_USER
     MINIO_PASSWORD
     MINIO_CLIENT_GAMMA_STORAGE_BUCKET
-    MINIO_CLICKSTREAM_TELEMETRY_BUCKET
     KAFKA_BOOTSTRAP_SERVERS
-    KAFKA_CLICKSTREAM_USER_BEHAVIOUR_TOPIC
-    KAFKA_TELEMETRY_VEHICLE_STATS_TOPIC
-    KAFKA_ANALYTICS_SESSION_DURATION_TOPIC
     KAFKA_CLIENT_BETA_STORAGE_TOPIC
     CHUNK_SIZE
     SQLITE_DB_FILE
@@ -86,10 +82,7 @@ log "INFO - Checking and creating folders"
 FOLDERS=(
     /app/storage
     /app/scripts/support_insights
-    /app/scripts/clickstream_telemetry
     /app/scripts/python_scripts_orchestrator
-    /app/tests/support_insights_tests
-    /app/tests/clickstream_telemetry
 )
 for dir in "${FOLDERS[@]}"; do
     if [ ! -d "$dir" ]; then

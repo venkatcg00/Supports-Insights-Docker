@@ -37,8 +37,7 @@ echo "[INFO] Superset is healthy."
 echo "[INFO] Importing dashboard ZIP exports into Superset..."
 
 ZIP_PATHS=(
-  "/app/bitnami/superset_home/clickstream_telemetry/dashboard_export.zip"
-  "/app/bitnami/superset_home/support_insights/dashboard_export.zip"
+  "/app/superset_home/support_insights/dashboard_export.zip"
 )
 
 for ZIP in "${ZIP_PATHS[@]}"; do
