@@ -117,7 +117,7 @@ def end_dag_run(
                 run_end_time = datetime.now()
                 run_duration = run_end_time - run_start_time
                 validity_percentage = (round(
-                    (valid_count / batch_count) *
+                    (valid_count / (insert_count + update_count)) *
                     100, 2) if batch_count > 0 else 0.0)
                 dag_run_status = "SUCCESS"
 
