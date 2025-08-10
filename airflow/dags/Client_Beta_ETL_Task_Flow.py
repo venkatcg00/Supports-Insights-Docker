@@ -291,9 +291,9 @@ def client_beta_etl_dag():
 
                 batch_count = get_table_count("lnd", "client_beta_cs_data")
                 ti.xcom_push(key="batch_count", value=batch_count)
-                new_checkpoint = pg_hook.get_first(
-                    "SELECT COALESCE(MAX(support_identifier), 0) FROM lnd.client_beta_cs_data"
-                )[0]
+                new_checkpoint = df.agg({
+                    "kafka_offset": "max"
+                }).collect()[0][0]
                 ti.xcom_push(key="new_checkpoint", value=new_checkpoint)
 
                 update_dag_run_status(dag_run_id, "PROCESSING - LND TO PRS")
