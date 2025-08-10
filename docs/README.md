@@ -1,31 +1,42 @@
 # Insights & Telemetry Platform
 
 
-> Local, dockerized data platform that ingests synthetic customer-support telemetry from multiple sources (MongoDB, Kafka, and S3/MinIO) into a dimensional warehouse, orchestrated by Airflow and visualized in Superset.
+> Local, dockerized data platform that ingests synthetic customer-support data from multiple sources (MongoDB, Kafka, and S3/MinIO) into a dimensional warehouse, orchestrated by Airflow and visualized in Superset.
 
 
 
 
 
 ## Table of Contents
-- [Overview](#overview)
-- [Architecture](#architecture)
-- [Tech Stack](#tech-stack)
-- [Repository Layout](#repository-layout)
-- [Quickstart](#quickstart)
-- [Configuration](#configuration)
-  - [Environment (.env)](#environment-env)
-  - [Airflow Connections](#airflow-connections)
-  - [Airflow Variables](#airflow-variables)
-- [Pipelines](#pipelines)
-  - [Client Alpha — Mongo ➜ Postgres DW](#client-alpha--mongo--postgres-dw)
-  - [Client Beta — Kafka ➜ Postgres DW](#client-beta--kafka--postgres-dw)
-  - [Client Gamma — MinIO (S3) ➜ Postgres DW](#client-gamma--minio-s3--postgres-dw)
-- [Data Model](#data-model)
-- [Dashboards (Superset)](#dashboards-superset)
-- [Synthetic Data Generators](#synthetic-data-generators)
-- [Troubleshooting](#troubleshooting)
-- [License](#license)
+- [Insights \& Telemetry Platform](#insights--telemetry-platform)
+  - [Table of Contents](#table-of-contents)
+  - [Overview](#overview)
+  - [Architecture](#architecture)
+    - [Topology](#topology)
+    - [ETL Data Flow (inside Postgres)](#etl-data-flow-inside-postgres)
+  - [Tech Stack](#tech-stack)
+  - [Repository Layout](#repository-layout)
+  - [Quickstart](#quickstart)
+    - [One‑command setup](#onecommand-setup)
+    - [Open the UIs](#open-the-uis)
+    - [Lifecycle helpers](#lifecycle-helpers)
+  - [Configuration](#configuration)
+    - [Environment (.env)](#environment-env)
+    - [Airflow Connections](#airflow-connections)
+    - [Airflow Variables](#airflow-variables)
+  - [Pipelines](#pipelines)
+    - [Client Alpha — Mongo ➜ Postgres DW](#client-alpha--mongo--postgres-dw)
+    - [Client Beta — Kafka ➜ Postgres DW](#client-beta--kafka--postgres-dw)
+    - [Client Gamma — MinIO (S3) ➜ Postgres DW](#client-gamma--minio-s3--postgres-dw)
+  - [Data Model](#data-model)
+  - [Dashboards (Superset)](#dashboards-superset)
+  - [Screenshots](#screenshots)
+    - [Orchestrator \& Generators UI](#orchestrator--generators-ui)
+    - [Airflow](#airflow)
+    - [Superset Dashboards](#superset-dashboards)
+  - [Synthetic Data Generators](#synthetic-data-generators)
+  - [Troubleshooting](#troubleshooting)
+  - [License](#license)
 
 
 
@@ -42,24 +53,110 @@ This repository spins up a complete data playground on your laptop:
 
 - **BI**: **Apache Superset** ships with pre-built connections and a demo dashboard export.
 
-Use it to prototype telemetry/ETL patterns, data-quality checks, and end-to-end orchestration.
+Use it to prototype ETL patterns, data-quality checks, and end-to-end orchestration.
+
 
 
 
 ## Architecture
 
+The platform runs locally with Docker Compose. Airflow orchestrates PySpark jobs that extract from MongoDB, Kafka, and MinIO, then land and model data in PostgreSQL for Superset dashboards.
+
+### Topology
+
+
+```mermaid
+---
+config:
+  layout: dagre
+  theme: redux
+  look: neo
+---
+flowchart LR
+ subgraph Sources["Sources"]
+        M["MongoDB:27017
+    DB: ${MONGO_DATABASE_NAME}"]
+        K["Kafka Broker:9092
+    Topic: ${KAFKA_CLIENT_BETA_STORAGE_TOPIC}"]
+        S["MinIO
+    S3 API :9000
+    Console :9001
+    Bucket: ${MINIO_CLIENT_GAMMA_STORAGE_BUCKET}"]
+  end
+ subgraph Generators["Synthetic Data Generators UI (1212)"]
+        GU["Web UI / Launchers"]
+        GAlpha["Alpha Producer"]
+        GBeta["Beta Producer"]
+        GGamma["Gamma Producer"]
+  end
+ subgraph Orchestration["Apache Airflow (8080)"]
+        AW["Webserver"]
+        AS["Scheduler"]
+  end
+ subgraph Processing["PySpark Runtime"]
+        SP["Spark Driver + Executors
+    local[*]"]
+  end
+ subgraph Storage["PostgreSQL (5432)"]
+        PG_DB["(PostgreSQL DB)"]
+        ADB["(Airflow DB)"]
+        SDB["(Superset DB)"]
+  end
+ subgraph BI["Apache Superset (8088)"]
+        SU["Superset UI"]
+  end
+    GU --> GAlpha & GBeta & GGamma
+    AW --> AS
+    GAlpha -- insert docs --> M
+    GBeta -- produce events --> K
+    GGamma -- "upload .csv.gz" --> S
+    AS -- trigger tasks --> SP
+    AS -- Airflow Connections --> M & K
+    AS -- Airflow Connections (AWS/MinIO) --> S
+    M -- Alpha extract --> SP
+    K -- Beta read --> SP
+    S -- Gamma read --> SP
+    SP -- JDBC writes
+      (LND to PRS to CDC to PRE_DM to DM) --> PG_DB
+    PG_DB -- SQLAlchemy --> SU
+     M:::source
+     K:::source
+     S:::source
+     GU:::ui
+     AW:::orches
+     AS:::orches
+     SP:::compute
+     PG_DB:::store
+     ADB:::store
+     SDB:::store
+     SU:::ui
+    classDef store fill:#f2f7ff,stroke:#5b8def
+    classDef source fill:#f7fff2,stroke:#49a078
+    classDef compute fill:#fff7f2,stroke:#f39c12
+    classDef orches fill:#f5f5ff,stroke:#7d6ee7
+    classDef ui fill:#fff,stroke:#aaa
 ```
-┌─────────┐        ┌─────────────┐
-│ MongoDB │  ───▶  │             │
-└─────────┘        │             │
-                   │             │
-┌─────────┐        │             │      ┌─────────────┐
-│ Kafka   │  ───▶  │   Airflow   │  ──▶ │  Postgres   │ ──▶ Superset
-└─────────┘        │   + Spark   │      │ (DW schemas)│
-                   │             │      └─────────────┘
-┌─────────┐        │             │
-│ MinIO   │  ───▶  │             │
-└─────────┘        └─────────────┘
+
+
+### ETL Data Flow (inside Postgres)
+
+
+```mermaid
+flowchart LR
+  LND[(lnd.*)] --> PRS[(prs.*)]
+  PRS --> CDC[(cdc.*)]
+  CDC --> PRE[(pre_dm.*)]
+  PRE --> DM[(dm.customer_support_fact)]
+  DM --> VW[(vw.*  views)]
+
+  DM --> AUD[(aud.dag_runs)]
+  DS[(ds.*)] --> PRE
+  INFO[(info.*)] --> PRE
+
+  classDef tier fill:#eef7ff,stroke:#5b8def;
+  classDef meta fill:#fff7e6,stroke:#f39c12;
+  class LND,PRS,CDC,PRE,DM,VW tier;
+  class AUD,DS,INFO meta;
 ```
 
 
@@ -99,7 +196,7 @@ Use it to prototype telemetry/ETL patterns, data-quality checks, and end-to-end 
   - client_gamma_data_generator.py
   - db_operations.py
 - infra
-  - .env
+  - .env**
   - docker-compose.yml
   - entrypoint
     - data_generator_orchestrator.py
@@ -135,61 +232,51 @@ Use it to prototype telemetry/ETL patterns, data-quality checks, and end-to-end 
     - 13_ds_schema_tables_inserts.sql
     - 14_info_schema_tables_inserts.sql
     - 15_vw_schema_views_creation.sql
-    - 16_user_creation.sql
+    - 16_user_creation.sql***
 - superset
   - exports
     - dashboard_export.zip
 ```
 
+**  - These files are system specific and should be created on their own.
+
+*** - Created during runtime.
 
 
 ## Quickstart
 
 > Prereqs: Docker Desktop (or Docker Engine) and Docker Compose v2; Bash-compatible shell.
 
+### One‑command setup
+
 ```bash
-# 1) Move into the infra folder
 cd infra
-
-# 2) Create your environment file (minimal example)
-cat > .env <<'EOF'
-PROJECT_USER=admin
-PROJECT_PASSWORD=admin
-POSTGRES_PORT=5432
-POSTGRES_DATABASE_NAME=support_insights
-
-MONGO_PORT=27017
-MONGO_DATABASE_NAME=support_insights
-
-# If you change these, also update scripts and Airflow connections accordingly
-KAFKA_BROKER_PORT=9092
-
-# Typical MinIO defaults; adjust if your compose uses different ports
-MINIO_API_PORT=9000
-MINIO_CONSOLE_PORT=9001
-EOF
-
-# 3) Boot the stack
-docker compose -f docker-compose.yml up -d
-
-# 4) (Optional) Wait for containers to be healthy
-bash scripts/wait_for_containers_health.sh
-
-# 5) Initialize connections, variables, and assets
-bash scripts/create_postgres_user.sh
-bash scripts/create_airflow_connections.sh
-bash scripts/create_airflow_variables.sh
-bash scripts/create_kafka_topics.sh
-bash scripts/create_minio_buckets.sh
-
-# 6) Import Superset dashboards
-bash scripts/import_superset_dashboards.sh
-
-# 7) Print local endpoints (Airflow, Superset, MinIO Console, etc.)
-bash scripts/print_endpoints.sh
+chmod +x platform_setup.sh  # once
+./platform_setup.sh setup
 ```
 
-Now open Airflow and trigger one of the `Client_*_ETL_Task_Flow` DAGs.
+This builds & starts all services, seeds connections/variables, creates topics/buckets, and imports Superset assets.
+
+### Open the UIs
+
+- **Synthetic Data Generators**: http://localhost:1212  
+  Trigger/start the generators for Alpha (Mongo), Beta (Kafka), and Gamma (MinIO).
+
+- **Airflow**: http://localhost:8080  
+  Trigger the `Client_*_ETL_Task_Flow` DAGs.
+
+- **Superset**: http://localhost:8088  
+  Browse the demo dashboards.
+
+> Tip: `bash scripts/print_endpoints.sh` also prints all service URLs once the stack is up.
+
+### Lifecycle helpers
+```bash
+./platform_setup.sh start     # start services (if already built)
+./platform_setup.sh stop      # stop services (keep data volumes)
+./platform_setup.sh status    # show container health (add --watch to stream)
+./platform_setup.sh reset     # destroy & recreate everything (DANGEROUS)
+```
 
 
 
@@ -263,6 +350,21 @@ Bootstrap SQL lives under `infra/sql/` and is mounted into Postgres on first run
 
 
 ## Dashboards (Superset)
+
+
+## Screenshots
+
+### Orchestrator & Generators UI
+![Generators UI](/docs/images/Orchestration_UI.png)
+
+### Airflow
+![Airflow — DAGs list](/docs/images/Airflow_DAGs.png)
+![Client Alpha DAG Graph](/docs/images/Client_Alpha_ETL_Task_Flow-graph.png)
+
+### Superset Dashboards
+![Data Metrics Dashboard](/docs/images/Dashboard-Data%20Metrics%20View.png)
+![Interactions Dashboard](/docs/images/Dashboard-Interactions%20Metrics%20View.png)
+
 
 - Superset container is provisioned to connect to the DW
 - Demo assets exported to `superset/exports/dashboard_export.zip`
