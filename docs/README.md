@@ -66,12 +66,6 @@ The platform runs locally with Docker Compose. Airflow orchestrates PySpark jobs
 
 
 ```mermaid
----
-config:
-  layout: dagre
-  theme: redux
-  look: neo
----
 flowchart LR
  subgraph Sources["Sources"]
         M["MongoDB:27017
