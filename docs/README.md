@@ -170,71 +170,84 @@ flowchart LR
 ## Repository Layout
 
 ```
-- .gitignore
-- airflow
-  - dags
-    - Client_Alpha_ETL_Task_Flow.py
-    - Client_Beta_ETL_Task_Flow.py
-    - Client_Gamma_ETL_Task_Flow.py
-    - db_dag_operations.py
-- docker
-  - airflow.dockerfile
-  - orchestration_ui.dockerfile
-  - superset.dockerfile
-- docs
-  - LICENSE
-  - README.md
-- generators
-  - client_alpha_data_generator.py
-  - client_beta_data_generator.py
-  - client_gamma_data_generator.py
-  - db_operations.py
-- infra
-  - .env**
-  - docker-compose.yml
-  - entrypoint
-    - data_generator_orchestrator.py
-    - orchestration_ui_startup.sh
-    - postgresql-jdbc.jar
-    - sqlite3_db_setup.sql
-    - superset_startup.sh
-  - platform_setup.sh
-  - scripts
-    - create_airflow_connections.sh
-    - create_airflow_variables.sh
-    - create_kafka_topics.sh
-    - create_minio_buckets.sh
-    - create_postgres_user.sh
-    - create_superset_connections.sh
-    - import_superset_dashboards.sh
-    - print_endpoints.sh
-    - wait_for_airflow_components.sh
-    - wait_for_containers_health.sh
-  - sql
-    - 01_database_creation.sql
-    - 02_schema_creation.sql
-    - 03_ds_schema_tables_creation.sql
-    - 04_info_schema_tables_creation.sql
-    - 05_aud_schema_tables_creation.sql
-    - 06_lnd_schema_tables_creation.sql
-    - 07_cdc_schema_tables_creation.sql
-    - 08_prs_schema_tables_creation.sql
-    - 09_pre_dm_schema_tables_creation.sql
-    - 10_dm_schema_tables_creation.sql
-    - 11_dwh_schema_tables_creation.sql
-    - 12_func_triggers_creation.sql
-    - 13_ds_schema_tables_inserts.sql
-    - 14_info_schema_tables_inserts.sql
-    - 15_vw_schema_views_creation.sql
-    - 16_user_creation.sql***
-- superset
-  - exports
-    - dashboard_export.zip
-```
+.
+├── .gitignore
+├── airflow
+│   ├── dags
+│   │   ├── Client_Alpha_ETL_Task_Flow.py
+│   │   ├── Client_Beta_ETL_Task_Flow.py
+│   │   ├── Client_Gamma_ETL_Task_Flow.py
+│   │   ├── db_dag_operations.py
+│   └── plugins
+├── docker
+│   ├── airflow.dockerfile
+│   ├── orchestration_ui.dockerfile
+│   └── superset.dockerfile
+├── docs
+│   ├── images
+│   │   ├── Airflow_DAGs.png
+│   │   ├── Client_Alpha_ETL_Task_Flow-graph.png
+│   │   ├── Client_Beta_ETL_Task_Flow-graph.png
+│   │   ├── Client_Gamma_ETL_Task_Flow-graph.png
+│   │   ├── Dashboard-Data Metrics View.png
+│   │   ├── Dashboard-Interactions Metrics View.png
+│   │   ├── Orchestration_UI.png
+│   │   └── RDBMS_Entity_Relationship_Diagram.png
+│   ├── LICENSE
+│   └── README.md
+├── generators
+│   ├── client_alpha_data_generator.py
+│   ├── client_beta_data_generator.py
+│   ├── client_gamma_data_generator.py
+│   ├── db_operations.py
+├── infra
+│   ├── .env**
+│   ├── docker-compose.yml
+│   ├── entrypoint
+│   │   ├── data_generator_orchestrator.py
+│   │   ├── orchestration_ui_startup.sh
+│   │   ├── postgresql-jdbc.jar
+│   │   ├── sqlite3_db_setup.sql
+│   │   └── superset_startup.sh
+│   ├── platform_setup.sh
+│   ├── scripts
+│   │   ├── create_airflow_connections.sh
+│   │   ├── create_airflow_variables.sh
+│   │   ├── create_kafka_topics.sh
+│   │   ├── create_minio_buckets.sh
+│   │   ├── create_postgres_user.sh
+│   │   ├── create_superset_connections.sh
+│   │   ├── import_superset_dashboards.sh
+│   │   ├── print_endpoints.sh
+│   │   ├── wait_for_airflow_components.sh
+│   │   └── wait_for_containers_health.sh
+│   └── sql
+│       ├── 01_database_creation.sql
+│       ├── 02_schema_creation.sql
+│       ├── 03_ds_schema_tables_creation.sql
+│       ├── 04_info_schema_tables_creation.sql
+│       ├── 05_aud_schema_tables_creation.sql
+│       ├── 06_lnd_schema_tables_creation.sql
+│       ├── 07_cdc_schema_tables_creation.sql
+│       ├── 08_prs_schema_tables_creation.sql
+│       ├── 09_pre_dm_schema_tables_creation.sql
+│       ├── 10_dm_schema_tables_creation.sql
+│       ├── 11_dwh_schema_tables_creation.sql
+│       ├── 12_func_triggers_creation.sql
+│       ├── 13_ds_schema_tables_inserts.sql
+│       ├── 14_info_schema_tables_inserts.sql
+│       ├── 15_vw_schema_views_creation.sql
+│       └── 16_user_creation.sql***
+└── superset
+    └── exports
+        └── dashboard_export.zip
 
 **  - These files are system specific and should be created on their own.
-
 *** - Created during runtime.
+
+```
+
+
 
 
 ## Quickstart
@@ -253,7 +266,7 @@ This builds & starts all services, seeds connections/variables, creates topics/b
 
 ### Open the UIs
 
-- **Synthetic Data Generators**: http://localhost:1212  
+- **Synthetic Data Generators**: http://localhost:1212 (user set port)  
   Trigger/start the generators for Alpha (Mongo), Beta (Kafka), and Gamma (MinIO).
 
 - **Airflow**: http://localhost:8080  
@@ -308,7 +321,7 @@ Created by `scripts/create_airflow_connections.sh`:
 
 ### Client Alpha — Mongo ➜ Postgres DW
 
-- **Source**: MongoDB documents
+- **Source**: MongoDB documents (`MONGO_DATABASE_NAME`)
 - **Flow**: `LND` (landing) ➜ `PRS` (persistent) ➜ `CDC` ➜ `PRE_DM` ➜ `DM`
 - **Key file**: `airflow/dags/Client_Alpha_ETL_Task_Flow.py`
 - **Conn IDs**: `mongo_project_connection`, `postgres_project_connection`
@@ -337,7 +350,7 @@ Warehouse lives in Postgres database `support_insights`:
 - Schemas: `ds`, `info`, `aud`, `lnd`, `cdc`, `prs`, `pre_dm`, `dm`, `dwh`, `vw`
 - `aud.dag_runs` tracks run metrics per DAG
 - `dm.customer_support_fact` holds curated interactions
-- Materialized **views** in `vw` (e.g., `vw.data_metrics_view`, `vw.customer_support_analytics_view`) join fact tables with dictionaries from `ds` and `info`
+- **Views** in `vw` (e.g., `vw.data_metrics_view`, `vw.customer_support_analytics_view`) holds data in dernomalized manner.
 
 Bootstrap SQL lives under `infra/sql/` and is mounted into Postgres on first run.
 
@@ -353,22 +366,14 @@ Bootstrap SQL lives under `infra/sql/` and is mounted into Postgres on first run
 
 ### Airflow
 ![Airflow — DAGs list](/docs/images/Airflow_DAGs.png)
-![Client Alpha DAG Graph](/docs/images/Client_Alpha_ETL_Task_Flow-graph.png)
+The dag flow graphs are accesible through [images](/docs/images)
 
 ### Superset Dashboards
+#### Data Metrics Dashboard
 ![Data Metrics Dashboard](/docs/images/Dashboard-Data%20Metrics%20View.png)
+
+#### Interactions Dashboard
 ![Interactions Dashboard](/docs/images/Dashboard-Interactions%20Metrics%20View.png)
-
-
-- Superset container is provisioned to connect to the DW
-- Demo assets exported to `superset/exports/dashboard_export.zip`
-- After bringing up the stack, run:
-  ```bash
-  bash infra/scripts/create_superset_connections.sh
-  bash infra/scripts/import_superset_dashboards.sh
-  ```
-Then log into Superset (URL printed by `scripts/print_endpoints.sh`) and browse the dashboard.
-
 
 
 ## Synthetic Data Generators
@@ -380,18 +385,6 @@ Under `generators/` you'll find lightweight producers for each client:
 - `client_gamma_data_generator.py` — writes gzipped CSVs to MinIO (S3)
 
 They use small lookup tables and checkpointing helpers (`generators/db_operations.py`). You can run them separately to seed data before triggering the DAGs.
-
-
-
-## Troubleshooting
-
-- **Spark JVM killed / `SIGKILL`** during writes: reduce partitions before JDBC writes:
-  ```python
-  df.coalesce(6).write.option("numPartitions","6").option("batchsize","5000")...
-  ```
-- **Too many DB connections**: keep `numPartitions` ≤ 8 for Postgres.
-- **No new data**: verify your source (Mongo/Kafka/MinIO) has fresh records and that the Airflow Variables/Connections are set.
-- **Superset can't connect**: re-run `create_superset_connections.sh` after containers are healthy.
 
 
 
